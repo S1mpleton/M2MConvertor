@@ -15,6 +15,7 @@
 #include <QRegularExpression>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QStyle>
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QVBoxLayout>
@@ -46,7 +47,12 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
 QWidget* AutomatonEditor::createTablePage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(14, 14, 14, 14);
+    layout->setSpacing(10);
+    auto* description = new QGroupBox(tr("Описание автомата"));
+    auto* descriptionLayout = new QVBoxLayout(description);
     auto* form = new QFormLayout;
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_typeLabel = new QLabel;
     m_statesEdit = new QLineEdit;
     m_inputsEdit = new QLineEdit;
@@ -60,10 +66,12 @@ QWidget* AutomatonEditor::createTablePage() {
     form->addRow(tr("Входные сигналы:"), m_inputsEdit);
     form->addRow(tr("Выходные сигналы:"), m_outputsEdit);
     form->addRow(tr("Начальное состояние:"), m_initialCombo);
-    layout->addLayout(form);
+    descriptionLayout->addLayout(form);
     auto* configure = new QPushButton(tr("Создать таблицу"));
     configure->setObjectName(QStringLiteral("configureTableButton"));
-    layout->addWidget(configure, 0, Qt::AlignLeft);
+    configure->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+    descriptionLayout->addWidget(configure, 0, Qt::AlignRight);
+    layout->addWidget(description);
     m_transitionTable = new QTableWidget;
     m_transitionTable->setAlternatingRowColors(true);
     m_transitionTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
@@ -75,6 +83,7 @@ QWidget* AutomatonEditor::createTablePage() {
     layout->addWidget(hint);
     auto* accept = new QPushButton(tr("Принять таблицу"));
     accept->setObjectName(QStringLiteral("acceptTableButton"));
+    accept->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     m_tableFeedback = new QLabel;
     m_tableFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
@@ -92,10 +101,13 @@ QWidget* AutomatonEditor::createTablePage() {
 QWidget* AutomatonEditor::createMatrixPage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(14, 14, 14, 14);
+    layout->setSpacing(10);
     auto* row = new QHBoxLayout;
     m_matrixDimension = new QSpinBox;
     m_matrixDimension->setRange(1, 200);
     auto* create = new QPushButton(tr("Создать пустую матрицу"));
+    create->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     row->addWidget(new QLabel(tr("Размерность:")));
     row->addWidget(m_matrixDimension);
     row->addWidget(create);
@@ -111,6 +123,7 @@ QWidget* AutomatonEditor::createMatrixPage() {
     hint->setWordWrap(true);
     layout->addWidget(hint);
     auto* accept = new QPushButton(tr("Принять матрицу"));
+    accept->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     m_matrixFeedback = new QLabel;
     m_matrixFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
@@ -124,6 +137,8 @@ QWidget* AutomatonEditor::createMatrixPage() {
 QWidget* AutomatonEditor::createGraphPage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(14, 14, 14, 14);
+    layout->setSpacing(10);
     auto* splitter = new QSplitter(Qt::Vertical);
     auto* editor = new QWidget;
     auto* editorLayout = new QVBoxLayout(editor);
@@ -134,6 +149,8 @@ QWidget* AutomatonEditor::createGraphPage() {
     auto* buttons = new QHBoxLayout;
     auto* add = new QPushButton(tr("Добавить дугу"));
     auto* remove = new QPushButton(tr("Удалить выбранную дугу"));
+    add->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+    remove->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
     buttons->addWidget(add);
     buttons->addWidget(remove);
     buttons->addStretch();
@@ -149,6 +166,7 @@ QWidget* AutomatonEditor::createGraphPage() {
     hint->setWordWrap(true);
     layout->addWidget(hint);
     auto* accept = new QPushButton(tr("Принять граф"));
+    accept->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     m_graphFeedback = new QLabel;
     m_graphFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
@@ -519,9 +537,10 @@ void AutomatonEditor::invalidateGraph() {
 }
 
 void AutomatonEditor::showFeedback(QLabel* label, const QString& message, bool success) {
-    label->setText(message);
-    label->setStyleSheet(success ? QStringLiteral("color:#15803d;font-weight:600")
-                                 : QStringLiteral("color:#b91c1c;font-weight:600"));
+    label->setText((success ? QStringLiteral("✓ ") : QStringLiteral("⚠ ")) + message);
+    QFont font = label->font();
+    font.setBold(true);
+    label->setFont(font);
 }
 
 QJsonArray AutomatonEditor::tableToJson(const QTableWidget* table) const {

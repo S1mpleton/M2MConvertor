@@ -14,6 +14,7 @@ AutomatonCanvas::AutomatonCanvas(QWidget* parent)
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
     setMinimumHeight(280);
+    setBackgroundBrush(palette().brush(QPalette::Base));
 }
 
 void AutomatonCanvas::clearAutomaton() {
@@ -31,6 +32,10 @@ void AutomatonCanvas::setAutomaton(const Automaton& automaton) {
         centers.append(QPointF(radius * qCos(angle), radius * qSin(angle)));
     }
     const qreal nodeRadius = 30.0;
+    const QColor edgeColor = palette().color(QPalette::Text);
+    const QColor nodeColor = palette().color(QPalette::Highlight);
+    const QColor nodeFill = palette().color(QPalette::AlternateBase);
+    const QColor textColor = palette().color(QPalette::Text);
     for (const Transition& edge : automaton.transitions) {
         const QPointF from = centers[edge.from];
         const QPointF to = centers[edge.to];
@@ -40,7 +45,7 @@ void AutomatonCanvas::setAutomaton(const Automaton& automaton) {
             (outputs.isEmpty() ? QString() : QStringLiteral(" / ") + outputs.join(','));
         if (edge.from == edge.to) {
             const QRectF loop(from.x() - 22, from.y() - 72, 44, 48);
-            m_scene->addEllipse(loop, QPen(QColor("#475569"), 1.6));
+            m_scene->addEllipse(loop, QPen(edgeColor, 1.6));
             auto* text = m_scene->addText(label);
             text->setPos(from.x() - text->boundingRect().width() / 2, from.y() - 98);
             continue;
@@ -49,7 +54,7 @@ void AutomatonCanvas::setAutomaton(const Automaton& automaton) {
         direction.setLength(qMax<qreal>(0, direction.length() - nodeRadius));
         QLineF line(direction.p1(), direction.p2());
         line.setP1(direction.pointAt(nodeRadius / QLineF(from, to).length()));
-        m_scene->addLine(line, QPen(QColor("#475569"), 1.6));
+        m_scene->addLine(line, QPen(edgeColor, 1.6));
         const qreal angle = std::atan2(-line.dy(), line.dx());
         const QPointF tip = line.p2();
         QPolygonF arrow;
@@ -58,7 +63,7 @@ void AutomatonCanvas::setAutomaton(const Automaton& automaton) {
                                std::cos(angle + M_PI / 3) * 10)
               << tip + QPointF(std::sin(angle + M_PI - M_PI / 3) * 10,
                                std::cos(angle + M_PI - M_PI / 3) * 10);
-        m_scene->addPolygon(arrow, QPen(Qt::NoPen), QBrush(QColor("#475569")));
+        m_scene->addPolygon(arrow, QPen(Qt::NoPen), QBrush(edgeColor));
         auto* text = m_scene->addText(label);
         const QPointF middle = line.pointAt(0.5);
         text->setPos(middle.x() - text->boundingRect().width() / 2,
@@ -76,11 +81,11 @@ void AutomatonCanvas::setAutomaton(const Automaton& automaton) {
         const QRectF rect(centers[state].x() - nodeRadius,
                           centers[state].y() - nodeRadius,
                           nodeRadius * 2, nodeRadius * 2);
-        m_scene->addEllipse(rect, QPen(QColor("#2563eb"), 2), QBrush(QColor("#eff6ff")));
+        m_scene->addEllipse(rect, QPen(nodeColor, 2), QBrush(nodeFill));
         if (state == automaton.initialState)
-            m_scene->addEllipse(rect.adjusted(4, 4, -4, -4), QPen(QColor("#2563eb"), 1));
+            m_scene->addEllipse(rect.adjusted(4, 4, -4, -4), QPen(nodeColor, 1));
         auto* text = m_scene->addText(title);
-        text->setDefaultTextColor(QColor("#0f172a"));
+        text->setDefaultTextColor(textColor);
         text->setPos(centers[state].x() - text->boundingRect().width() / 2,
                      centers[state].y() - text->boundingRect().height() / 2);
     }

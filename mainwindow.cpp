@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QImage>
@@ -22,8 +23,10 @@
 #include <QPushButton>
 #include <QSaveFile>
 #include <QSpinBox>
+#include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTabWidget>
 #include <QTextStream>
 #include <QVBoxLayout>
@@ -44,35 +47,22 @@ QString automatonSummary(const Automaton& automaton) {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle(tr("M2MConvertor — эквивалентные автоматы"));
-    resize(1100, 780);
-    setMinimumSize(850, 620);
+    resize(1200, 820);
+    setMinimumSize(900, 640);
     m_pages = new QStackedWidget;
     m_pages->addWidget(createLandingPage());
     m_pages->addWidget(createWorkspacePage());
     setCentralWidget(m_pages);
     createMenus();
-    setStyleSheet(QStringLiteral(
-        "QMainWindow{background:#f8fafc}"
-        "QGroupBox{font-weight:600;border:1px solid #cbd5e1;border-radius:7px;"
-        "margin-top:10px;padding-top:9px;background:white}"
-        "QGroupBox::title{subcontrol-origin:margin;left:10px;padding:0 4px}"
-        "QPushButton{padding:7px 14px;border:1px solid #94a3b8;border-radius:5px;background:#fff}"
-        "QPushButton:hover{background:#eff6ff;border-color:#3b82f6}"
-        "QPushButton:disabled{color:#94a3b8;background:#f1f5f9}"
-        "QLineEdit,QComboBox,QSpinBox{padding:5px;border:1px solid #94a3b8;border-radius:4px}"
-        "QTabWidget::pane{border:1px solid #cbd5e1;background:white}"
-        "QTabBar::tab{padding:8px 14px}"
-        "QTabBar::tab:selected{background:white;color:#1d4ed8;font-weight:600}"));
 }
 
 QWidget* MainWindow::createLandingPage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
-    outer->addStretch();
-    auto* panel = new QGroupBox(tr("Новая учебная работа"));
-    panel->setMaximumWidth(720);
-    auto* layout = new QVBoxLayout(panel);
+    outer->setContentsMargins(36, 28, 36, 32);
+    outer->setSpacing(18);
     auto* title = new QLabel(tr("Преобразование конечных автоматов Мили и Мура"));
+    title->setObjectName(QStringLiteral("landingTitle"));
     QFont titleFont = title->font();
     titleFont.setPointSize(17);
     titleFont.setBold(true);
@@ -83,40 +73,78 @@ QWidget* MainWindow::createLandingPage() {
         "Направление преобразования определяется самим вариантом."));
     explanation->setWordWrap(true);
     explanation->setAlignment(Qt::AlignCenter);
-    layout->addWidget(title);
-    layout->addWidget(explanation);
+    outer->addWidget(title);
+    outer->addWidget(explanation);
+
+    auto* content = new QWidget;
+    content->setObjectName(QStringLiteral("landingContent"));
+    auto* contentLayout = new QHBoxLayout(content);
+    contentLayout->setContentsMargins(0, 12, 0, 12);
+    contentLayout->setSpacing(24);
+
+    auto* archiveGroup = new QGroupBox(tr("1. База вариантов"));
+    auto* archiveLayout = new QVBoxLayout(archiveGroup);
+    archiveLayout->setContentsMargins(20, 24, 20, 20);
+    archiveLayout->setSpacing(14);
+    auto* archiveHint = new QLabel(tr(
+        "Выберите защищённый файл BazaVar, экспортированный из M2MTools. "
+        "Приложение проверит целостность архива перед показом вариантов."));
+    archiveHint->setWordWrap(true);
+    archiveLayout->addWidget(archiveHint);
     auto* archiveRow = new QHBoxLayout;
     m_archivePathLabel = new QLabel(tr("BazaVar не выбран"));
     m_archivePathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_archivePathLabel->setWordWrap(true);
     auto* archiveButton = new QPushButton(tr("Открыть BazaVar…"));
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
+    archiveButton->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     archiveRow->addWidget(m_archivePathLabel, 1);
     archiveRow->addWidget(archiveButton);
-    layout->addLayout(archiveRow);
+    archiveLayout->addLayout(archiveRow);
+    archiveLayout->addStretch();
+
+    auto* variantGroup = new QGroupBox(tr("2. Вариант работы"));
+    auto* variantLayout = new QVBoxLayout(variantGroup);
+    variantLayout->setContentsMargins(20, 24, 20, 20);
+    variantLayout->setSpacing(14);
+    auto* variantHint = new QLabel(tr(
+        "Выберите номер варианта. Направление преобразования уже задано в базе "
+        "и будет выбрано автоматически."));
+    variantHint->setWordWrap(true);
+    variantLayout->addWidget(variantHint);
     auto* form = new QFormLayout;
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_variantCombo = new QComboBox;
     m_variantCombo->setEnabled(false);
     m_landingDirection = new QLabel(tr("—"));
     form->addRow(tr("Вариант:"), m_variantCombo);
     form->addRow(tr("Преобразование:"), m_landingDirection);
-    layout->addLayout(form);
+    variantLayout->addLayout(form);
+    variantLayout->addStretch();
+
+    contentLayout->addWidget(archiveGroup, 1);
+    contentLayout->addWidget(variantGroup, 1);
+    outer->addWidget(content, 1);
+
+    auto* actionHint = new QLabel(tr(
+        "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
+    actionHint->setAlignment(Qt::AlignCenter);
+    actionHint->setWordWrap(true);
+    outer->addWidget(actionHint);
     auto* actions = new QHBoxLayout;
     m_beginButton = new QPushButton(tr("Создать работу"));
     m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
     m_beginButton->setEnabled(false);
+    m_beginButton->setDefault(true);
+    m_beginButton->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     auto* openProgressButton = new QPushButton(tr("Открыть сохранённую работу…"));
     openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
+    openProgressButton->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     actions->addStretch();
     actions->addWidget(m_beginButton);
     actions->addWidget(openProgressButton);
     actions->addStretch();
-    layout->addLayout(actions);
-    auto* centered = new QHBoxLayout;
-    centered->addStretch();
-    centered->addWidget(panel);
-    centered->addStretch();
-    outer->addLayout(centered);
-    outer->addStretch();
+    outer->addLayout(actions);
     connect(archiveButton, &QPushButton::clicked, this, &MainWindow::chooseArchive);
     connect(m_variantCombo, &QComboBox::currentIndexChanged,
             this, &MainWindow::updateVariantSelection);
@@ -130,6 +158,7 @@ QWidget* MainWindow::createWorkspacePage() {
     auto* layout = new QVBoxLayout(page);
     auto* top = new QHBoxLayout;
     auto* back = new QPushButton(tr("← К выбору варианта"));
+    back->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
     m_variantTitle = new QLabel;
     QFont font = m_variantTitle->font();
     font.setPointSize(13);
@@ -163,22 +192,43 @@ QWidget* MainWindow::createWorkspacePage() {
 
 QWidget* MainWindow::createStartPage() {
     auto* page = new QWidget;
-    auto* layout = new QHBoxLayout(page);
-    auto* left = new QVBoxLayout;
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
     m_directionLabel = new QLabel;
     QFont directionFont = m_directionLabel->font();
     directionFont.setPointSize(15);
     directionFont.setBold(true);
     m_directionLabel->setFont(directionFont);
-    m_directionLabel->setAlignment(Qt::AlignCenter);
+    m_directionLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    layout->addWidget(m_directionLabel);
+
+    auto* splitter = new QSplitter(Qt::Horizontal);
+    splitter->setChildrenCollapsible(false);
+    auto* assignmentGroup = new QGroupBox(tr("Задание варианта"));
+    auto* assignmentLayout = new QVBoxLayout(assignmentGroup);
     m_diagramLabel = new QLabel(tr("В варианте отсутствует изображение"));
     m_diagramLabel->setAlignment(Qt::AlignCenter);
-    m_diagramLabel->setMinimumSize(420, 320);
-    m_diagramLabel->setStyleSheet(QStringLiteral("border:1px solid #cbd5e1;background:white"));
-    left->addWidget(m_directionLabel);
-    left->addWidget(m_diagramLabel, 1);
+    m_diagramLabel->setMinimumSize(360, 300);
+    m_diagramLabel->setFrameShape(QFrame::StyledPanel);
+    m_diagramLabel->setFrameShadow(QFrame::Sunken);
+    assignmentLayout->addWidget(m_diagramLabel, 1);
+
+    auto* workPanel = new QWidget;
+    auto* right = new QVBoxLayout(workPanel);
+    right->setContentsMargins(8, 0, 0, 0);
+    right->setSpacing(14);
+    auto* instructionsGroup = new QGroupBox(tr("Порядок работы"));
+    auto* instructionsLayout = new QVBoxLayout(instructionsGroup);
+    auto* instructions = new QLabel(tr(
+        "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
+        "ответа откроется последовательная работа с таблицей, матрицей и графом."));
+    instructions->setWordWrap(true);
+    instructionsLayout->addWidget(instructions);
+    right->addWidget(instructionsGroup);
     auto* counts = new QGroupBox(tr("Проверьте структуру исходного автомата"));
     auto* countLayout = new QFormLayout(counts);
+    countLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_stateCount = new QSpinBox;
     m_inputCount = new QSpinBox;
     m_outputCount = new QSpinBox;
@@ -189,20 +239,19 @@ QWidget* MainWindow::createStartPage() {
     countLayout->addRow(tr("Количество выходных сигналов:"), m_outputCount);
     auto* accept = new QPushButton(tr("Принять"));
     accept->setObjectName(QStringLiteral("acceptCountsButton"));
+    accept->setDefault(true);
+    accept->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     m_startFeedback = new QLabel;
     m_startFeedback->setWordWrap(true);
     countLayout->addRow(accept);
     countLayout->addRow(m_startFeedback);
-    auto* right = new QVBoxLayout;
-    auto* instructions = new QLabel(tr(
-        "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
-        "ответа откроется последовательная работа с таблицей, матрицей и графом."));
-    instructions->setWordWrap(true);
-    right->addWidget(instructions);
     right->addWidget(counts);
     right->addStretch();
-    layout->addLayout(left, 3);
-    layout->addLayout(right, 2);
+    splitter->addWidget(assignmentGroup);
+    splitter->addWidget(workPanel);
+    splitter->setStretchFactor(0, 3);
+    splitter->setStretchFactor(1, 2);
+    layout->addWidget(splitter, 1);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
     auto invalidate = [this] {
         if (!m_countsAccepted) return;
@@ -238,6 +287,7 @@ QWidget* MainWindow::createReportPage() {
     studentForm->addRow(tr("Номер зачётной книжки:"), m_recordBook);
     auto* create = new QPushButton(tr("Создать отчёт HTML…"));
     create->setObjectName(QStringLiteral("createReportButton"));
+    create->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
     m_reportFeedback = new QLabel;
     m_reportFeedback->setWordWrap(true);
     layout->addWidget(teacher);
@@ -251,10 +301,14 @@ QWidget* MainWindow::createReportPage() {
 
 void MainWindow::createMenus() {
     auto* file = menuBar()->addMenu(tr("Файл"));
-    auto* newWork = file->addAction(tr("Выбрать другой вариант"));
-    auto* open = file->addAction(tr("Открыть работу…"));
-    m_saveAction = file->addAction(tr("Сохранить работу"));
-    m_saveAsAction = file->addAction(tr("Сохранить работу как…"));
+    auto* newWork = file->addAction(style()->standardIcon(QStyle::SP_FileDialogNewFolder),
+                                    tr("Выбрать другой вариант"));
+    auto* open = file->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
+                                 tr("Открыть работу…"));
+    m_saveAction = file->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+                                   tr("Сохранить работу"));
+    m_saveAsAction = file->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+                                     tr("Сохранить работу как…"));
     file->addSeparator();
     auto* quit = file->addAction(tr("Выход"));
     m_saveAction->setEnabled(false);
@@ -538,7 +592,8 @@ void MainWindow::createReport() {
 }
 
 void MainWindow::setFeedback(QLabel* label, const QString& text, bool success) {
-    label->setText(text);
-    label->setStyleSheet(success ? QStringLiteral("color:#15803d;font-weight:600")
-                                 : QStringLiteral("color:#b91c1c;font-weight:600"));
+    label->setText((success ? QStringLiteral("✓ ") : QStringLiteral("⚠ ")) + text);
+    QFont font = label->font();
+    font.setBold(true);
+    label->setFont(font);
 }
