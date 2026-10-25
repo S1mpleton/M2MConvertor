@@ -15,6 +15,8 @@ qt_add_executable(M2MConvertor
     domain/automaton.h
     domain/conversionservice.cpp
     domain/conversionservice.h
+    domain/equivalencechecker.cpp
+    domain/equivalencechecker.h
     domain/isomorphismchecker.cpp
     domain/isomorphismchecker.h
     infrastructure/variantarchive.cpp
@@ -47,6 +49,7 @@ if(BUILD_TESTING)
         tests/domain_tests.cpp
         domain/automaton.cpp
         domain/conversionservice.cpp
+        domain/equivalencechecker.cpp
         domain/isomorphismchecker.cpp
         infrastructure/progressstore.cpp
         infrastructure/variantarchive.cpp
@@ -61,6 +64,7 @@ if(BUILD_TESTING)
         mainwindow.h
         domain/automaton.cpp
         domain/conversionservice.cpp
+        domain/equivalencechecker.cpp
         domain/isomorphismchecker.cpp
         infrastructure/variantarchive.cpp
         infrastructure/progressstore.cpp

@@ -1,5 +1,6 @@
 #include "ui/automatoneditor.h"
 
+#include "domain/equivalencechecker.h"
 #include "domain/isomorphismchecker.h"
 #include "ui/automatoncanvas.h"
 
@@ -54,6 +55,8 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* form = new QFormLayout;
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_typeLabel = new QLabel;
+    m_criterionLabel = new QLabel;
+    m_criterionLabel->setWordWrap(true);
     m_statesEdit = new QLineEdit;
     m_inputsEdit = new QLineEdit;
     m_outputsEdit = new QLineEdit;
@@ -62,6 +65,7 @@ QWidget* AutomatonEditor::createTablePage() {
     m_inputsEdit->setPlaceholderText(tr("x1, x2"));
     m_outputsEdit->setPlaceholderText(tr("y1, y2"));
     form->addRow(tr("Тип автомата:"), m_typeLabel);
+    form->addRow(tr("Критерий проверки:"), m_criterionLabel);
     form->addRow(tr("Состояния:"), m_statesEdit);
     form->addRow(tr("Входные сигналы:"), m_inputsEdit);
     form->addRow(tr("Выходные сигналы:"), m_outputsEdit);
@@ -182,10 +186,26 @@ QWidget* AutomatonEditor::createGraphPage() {
 }
 
 void AutomatonEditor::setExpected(const Automaton& expected) {
-    m_expected = expected;
+    m_reference = expected;
+    m_editorKind = expected.kind;
+    m_checkBehavioralEquivalence = false;
     resetEditor();
     m_typeLabel->setText(automatonKindName(expected.kind));
+    m_criterionLabel->setText(tr("Изоморфизм с автоматом варианта"));
     m_matrixDimension->setValue(expected.states.size());
+}
+
+void AutomatonEditor::setEquivalentTo(const Automaton& source,
+                                      AutomatonKind targetKind) {
+    m_reference = source;
+    m_editorKind = targetKind;
+    m_checkBehavioralEquivalence = true;
+    resetEditor();
+    m_typeLabel->setText(automatonKindName(targetKind));
+    m_criterionLabel->setText(tr(
+        "Поведенческая эквивалентность для всех входных последовательностей; "
+        "число и имена состояний могут отличаться"));
+    m_matrixDimension->setValue(1);
 }
 
 void AutomatonEditor::resetEditor() {
@@ -232,7 +252,7 @@ void AutomatonEditor::configureTable() {
     m_loading = true;
     m_initialCombo->clear();
     m_initialCombo->addItems(states);
-    const bool moore = m_expected.kind == AutomatonKind::Moore;
+    const bool moore = m_editorKind == AutomatonKind::Moore;
     m_transitionTable->clear();
     m_transitionTable->setColumnCount(states.size());
     m_transitionTable->setRowCount(inputs.size() + (moore ? 1 : 0));
@@ -273,7 +293,7 @@ QString AutomatonEditor::outputsText(const QSet<int>& outputs,
 bool AutomatonEditor::readTable(Automaton* result, QString* error) const {
     if (!result) return false;
     Automaton parsed;
-    parsed.kind = m_expected.kind;
+    parsed.kind = m_editorKind;
     parsed.states = parsedNames(m_statesEdit->text());
     parsed.inputs = parsedNames(m_inputsEdit->text());
     parsed.outputs = parsedNames(m_outputsEdit->text());
@@ -341,9 +361,9 @@ void AutomatonEditor::acceptTable() {
         showFeedback(m_tableFeedback, error, false);
         return;
     }
-    const IsomorphismResult check = IsomorphismChecker::compare(m_expected, actual);
-    showFeedback(m_tableFeedback, check.explanation, check.equivalent);
-    if (!check.equivalent) return;
+    const CandidateCheck check = checkCandidate(actual);
+    showFeedback(m_tableFeedback, check.explanation, check.accepted);
+    if (!check.accepted) return;
     m_tableAutomaton = actual;
     m_tableAccepted = true;
     m_tabs->setTabEnabled(1, true);
@@ -443,9 +463,9 @@ void AutomatonEditor::acceptMatrix() {
         showFeedback(m_matrixFeedback, error, false);
         return;
     }
-    const IsomorphismResult check = IsomorphismChecker::compare(m_expected, actual);
-    showFeedback(m_matrixFeedback, check.explanation, check.equivalent);
-    if (!check.equivalent) return;
+    const CandidateCheck check = checkCandidate(actual);
+    showFeedback(m_matrixFeedback, check.explanation, check.accepted);
+    if (!check.accepted) return;
     m_matrixAutomaton = actual;
     m_matrixAccepted = true;
     m_tabs->setTabEnabled(2, true);
@@ -503,12 +523,12 @@ void AutomatonEditor::acceptGraph() {
         showFeedback(m_graphFeedback, error, false);
         return;
     }
-    const IsomorphismResult check = IsomorphismChecker::compare(m_expected, actual);
-    showFeedback(m_graphFeedback, check.explanation, check.equivalent);
+    const CandidateCheck check = checkCandidate(actual);
+    showFeedback(m_graphFeedback, check.explanation, check.accepted);
     m_canvas->setAutomaton(actual);
     const bool wasComplete = m_graphAccepted;
-    m_graphAccepted = check.equivalent;
-    if (check.equivalent) m_graphAutomaton = actual;
+    m_graphAccepted = check.accepted;
+    if (check.accepted) m_graphAutomaton = actual;
     if (wasComplete != m_graphAccepted) emit completedChanged(m_graphAccepted);
 }
 
@@ -541,6 +561,18 @@ void AutomatonEditor::showFeedback(QLabel* label, const QString& message, bool s
     QFont font = label->font();
     font.setBold(true);
     label->setFont(font);
+}
+
+AutomatonEditor::CandidateCheck
+AutomatonEditor::checkCandidate(const Automaton& candidate) const {
+    if (m_checkBehavioralEquivalence) {
+        const EquivalenceResult result =
+            EquivalenceChecker::compare(m_reference, candidate);
+        return {result.equivalent, result.explanation};
+    }
+    const IsomorphismResult result =
+        IsomorphismChecker::compare(m_reference, candidate);
+    return {result.equivalent, result.explanation};
 }
 
 QJsonArray AutomatonEditor::tableToJson(const QTableWidget* table) const {
@@ -593,7 +625,7 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
     QString error;
     m_tableAccepted = object.value(QStringLiteral("tableAccepted")).toBool() &&
         readTable(&tableAutomaton, &error) &&
-        IsomorphismChecker::compare(m_expected, tableAutomaton).equivalent;
+        checkCandidate(tableAutomaton).accepted;
     if (m_tableAccepted) {
         m_tableAutomaton = tableAutomaton;
         m_tabs->setTabEnabled(1, true);
@@ -606,7 +638,7 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
         Automaton matrixAutomaton;
         m_matrixAccepted = object.value(QStringLiteral("matrixAccepted")).toBool() &&
             readMatrix(&matrixAutomaton, &error) &&
-            IsomorphismChecker::compare(m_expected, matrixAutomaton).equivalent;
+            checkCandidate(matrixAutomaton).accepted;
         if (m_matrixAccepted) {
             m_matrixAutomaton = matrixAutomaton;
             m_tabs->setTabEnabled(2, true);
@@ -622,7 +654,7 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
     m_graphAccepted = m_matrixAccepted &&
         object.value(QStringLiteral("graphAccepted")).toBool() &&
         readGraph(&graphAutomaton, &error) &&
-        IsomorphismChecker::compare(m_expected, graphAutomaton).equivalent;
+        checkCandidate(graphAutomaton).accepted;
     if (m_graphAccepted) {
         m_graphAutomaton = graphAutomaton;
         m_canvas->setAutomaton(graphAutomaton);

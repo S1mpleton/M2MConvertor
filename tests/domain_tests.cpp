@@ -1,4 +1,5 @@
 #include "domain/conversionservice.h"
+#include "domain/equivalencechecker.h"
 #include "domain/isomorphismchecker.h"
 #include "infrastructure/progressstore.h"
 #include "infrastructure/variantarchive.h"
@@ -140,6 +141,40 @@ int main(int argc, char** argv) {
     require(convertedBack.kind == AutomatonKind::Moore &&
             convertedBack.states.size() == 3,
             "Mealy-to-Moore creates output-split states and synthetic initial state");
+    require(EquivalenceChecker::compare(mealy, convertedBack).equivalent,
+            "constructed Moore automaton is behaviorally equivalent");
+
+    // Regression for a one-state Mealy loop q1 --x1/{y1,y2}--> q1. A Moore
+    // loop with {y1,y2} on its only state has the same reaction after every
+    // consumed input, even though it is not isomorphic to the two-state
+    // construction with a synthetic initial state.
+    Automaton oneStateMealy;
+    oneStateMealy.kind = AutomatonKind::Mealy;
+    oneStateMealy.states = {QStringLiteral("q1")};
+    oneStateMealy.inputs = {QStringLiteral("x1")};
+    oneStateMealy.outputs = {QStringLiteral("y1"), QStringLiteral("y2")};
+    oneStateMealy.initialState = 0;
+    oneStateMealy.transitions = {{0, 0, 0, {0, 1}}};
+    Automaton oneStateMoore;
+    oneStateMoore.kind = AutomatonKind::Moore;
+    oneStateMoore.states = {QStringLiteral("renamed")};
+    oneStateMoore.inputs = {QStringLiteral("input")};
+    oneStateMoore.outputs = {QStringLiteral("outA"), QStringLiteral("outB")};
+    oneStateMoore.initialState = 0;
+    oneStateMoore.mooreOutputs = {{0, 1}};
+    oneStateMoore.transitions = {{0, 0, 0, {}}};
+    require(EquivalenceChecker::compare(oneStateMealy, oneStateMoore).equivalent,
+            "one-state Mealy and Moore loops with the same reaction are equivalent");
+
+    Automaton redundantMoore = oneStateMoore;
+    redundantMoore.states.append(QStringLiteral("redundant"));
+    redundantMoore.mooreOutputs.append({0, 1});
+    redundantMoore.transitions = {{0, 0, 1, {}}, {1, 0, 1, {}}};
+    require(EquivalenceChecker::compare(oneStateMealy, redundantMoore).equivalent,
+            "reachable behaviorally indistinguishable states are minimized");
+    oneStateMoore.mooreOutputs[0] = {0};
+    require(!EquivalenceChecker::compare(oneStateMealy, oneStateMoore).equivalent,
+            "different output reaction is rejected");
 
     QTemporaryDir temporary;
     require(temporary.isValid(), "temporary directory created");
@@ -170,6 +205,6 @@ int main(int argc, char** argv) {
     archiveFile.close();
     require(!VariantArchive::load(archivePath, &variants, &error),
             "authenticated BazaVar modification is rejected");
-    std::cout << "PASS conversion, weighted graph isomorphism, BazaVar and progress round trip\n";
+    std::cout << "PASS conversion, behavioral equivalence, graph isomorphism, BazaVar and progress round trip\n";
     return 0;
 }

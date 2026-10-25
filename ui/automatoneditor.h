@@ -22,6 +22,7 @@ public:
     explicit AutomatonEditor(QWidget* parent = nullptr);
 
     void setExpected(const Automaton& expected);
+    void setEquivalentTo(const Automaton& source, AutomatonKind targetKind);
     void resetEditor();
     bool completed() const { return m_graphAccepted; }
     Automaton acceptedAutomaton() const { return m_graphAutomaton; }
@@ -32,6 +33,11 @@ signals:
     void completedChanged(bool completed);
 
 private:
+    struct CandidateCheck {
+        bool accepted = false;
+        QString explanation;
+    };
+
     QWidget* createTablePage();
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
@@ -48,6 +54,7 @@ private:
     void invalidateFromMatrix();
     void invalidateGraph();
     void showFeedback(QLabel* label, const QString& message, bool success);
+    CandidateCheck checkCandidate(const Automaton& candidate) const;
     QStringList parsedNames(const QString& text) const;
     QString outputsText(const QSet<int>& outputs, const Automaton& automaton) const;
     QSet<int> parseOutputs(const QString& text, const Automaton& automaton,
@@ -55,7 +62,9 @@ private:
     QJsonArray tableToJson(const QTableWidget* table) const;
     void tableFromJson(QTableWidget* table, const QJsonArray& array);
 
-    Automaton m_expected;
+    Automaton m_reference;
+    AutomatonKind m_editorKind = AutomatonKind::Mealy;
+    bool m_checkBehavioralEquivalence = false;
     Automaton m_tableAutomaton;
     Automaton m_matrixAutomaton;
     Automaton m_graphAutomaton;
@@ -70,6 +79,7 @@ private:
     QLineEdit* m_outputsEdit;
     QComboBox* m_initialCombo;
     QLabel* m_typeLabel;
+    QLabel* m_criterionLabel;
     QTableWidget* m_transitionTable;
     QLabel* m_tableFeedback;
 

@@ -392,7 +392,7 @@ void MainWindow::setupWorkspace(const TrainingVariant& variant) {
     }
     m_startFeedback->clear();
     m_sourceEditor->setExpected(variant.source);
-    m_targetEditor->setExpected(m_expectedTarget);
+    m_targetEditor->setEquivalentTo(variant.source, m_expectedTarget.kind);
     m_workflowTabs->setCurrentIndex(0);
     m_teacherName->clear(); m_teacherId->clear();
     m_studentName->clear(); m_studentId->clear();
@@ -572,7 +572,8 @@ void MainWindow::createReport() {
         "<p><b>Группа:</b> %8<br><b>Зачётная книжка:</b> %9</p>"
         "<h2>Результат</h2><p>%10</p><p>%11</p>"
         "<p><b>Проверка:</b> таблица, матрица и граф обоих автоматов приняты; "
-        "эквивалентный автомат изоморфен автоматически построенному эталону.</p>"
+        "результат преобразования поведенчески эквивалентен исходному автомату "
+        "для всех входных последовательностей.</p>"
         "<h2>Задание</h2><img src='data:%12;base64,%13'></html>")
         .arg(m_currentVariant.number)
         .arg(conversionDirectionName(m_currentVariant.direction).toHtmlEscaped())
