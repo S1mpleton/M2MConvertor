@@ -7,7 +7,7 @@
 #include <QJsonObject>
 #include <QWidget>
 
-class AutomatonCanvas;
+class AutomatonGraphEditor;
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -45,7 +45,6 @@ private:
     bool readTable(Automaton* result, QString* error) const;
     void configureMatrix();
     bool readMatrix(Automaton* result, QString* error) const;
-    void addGraphRow();
     bool readGraph(Automaton* result, QString* error) const;
     void acceptTable();
     void acceptMatrix();
@@ -87,8 +86,7 @@ private:
     QTableWidget* m_matrixTable;
     QLabel* m_matrixFeedback;
 
-    QTableWidget* m_edgeTable;
-    AutomatonCanvas* m_canvas;
+    AutomatonGraphEditor* m_graphEditor;
     QLabel* m_graphFeedback;
 };
 

@@ -23,8 +23,8 @@ qt_add_executable(M2MConvertor
     infrastructure/variantarchive.h
     infrastructure/progressstore.cpp
     infrastructure/progressstore.h
-    ui/automatoncanvas.cpp
-    ui/automatoncanvas.h
+    ui/automatongrapheditor.cpp
+    ui/automatongrapheditor.h
     ui/automatoneditor.cpp
     ui/automatoneditor.h
 )
@@ -45,6 +45,7 @@ target_link_libraries(M2MConvertor
 
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
     qt_add_executable(M2MConvertorTests
         tests/domain_tests.cpp
         domain/automaton.cpp
@@ -68,13 +69,14 @@ if(BUILD_TESTING)
         domain/isomorphismchecker.cpp
         infrastructure/variantarchive.cpp
         infrastructure/progressstore.cpp
-        ui/automatoncanvas.cpp
-        ui/automatoncanvas.h
+        ui/automatongrapheditor.cpp
+        ui/automatongrapheditor.h
         ui/automatoneditor.cpp
         ui/automatoneditor.h
     )
     target_include_directories(M2MConvertorGuiSmoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(M2MConvertorGuiSmoke PRIVATE Qt::Core Qt::Widgets OpenSSL::Crypto)
+    target_link_libraries(M2MConvertorGuiSmoke PRIVATE
+        Qt::Core Qt::Widgets Qt::Test OpenSSL::Crypto)
     add_test(NAME M2MConvertorGuiStartup COMMAND M2MConvertorGuiSmoke)
     set_tests_properties(M2MConvertorGuiStartup PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

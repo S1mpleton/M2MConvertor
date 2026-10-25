@@ -2,7 +2,7 @@
 
 #include "domain/equivalencechecker.h"
 #include "domain/isomorphismchecker.h"
-#include "ui/automatoncanvas.h"
+#include "ui/automatongrapheditor.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -15,7 +15,6 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSpinBox>
-#include <QSplitter>
 #include <QStyle>
 #include <QTableWidget>
 #include <QTabWidget>
@@ -143,30 +142,26 @@ QWidget* AutomatonEditor::createGraphPage() {
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(10);
-    auto* splitter = new QSplitter(Qt::Vertical);
-    auto* editor = new QWidget;
-    auto* editorLayout = new QVBoxLayout(editor);
-    m_edgeTable = new QTableWidget(0, 4);
-    m_edgeTable->setHorizontalHeaderLabels(
-        {tr("Из состояния"), tr("Вход"), tr("В состояние"), tr("Выходы (через запятую)")});
-    m_edgeTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     auto* buttons = new QHBoxLayout;
-    auto* add = new QPushButton(tr("Добавить дугу"));
-    auto* remove = new QPushButton(tr("Удалить выбранную дугу"));
+    auto* add = new QPushButton(tr("Создать вершину"));
+    add->setObjectName(QStringLiteral("createVertexButton"));
+    auto* remove = new QPushButton(tr("Удалить выбранную вершину"));
+    remove->setObjectName(QStringLiteral("deleteVertexButton"));
     add->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
     remove->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
     buttons->addWidget(add);
     buttons->addWidget(remove);
     buttons->addStretch();
-    editorLayout->addLayout(buttons);
-    editorLayout->addWidget(m_edgeTable);
-    m_canvas = new AutomatonCanvas;
-    splitter->addWidget(editor);
-    splitter->addWidget(m_canvas);
-    layout->addWidget(splitter, 1);
+    layout->addLayout(buttons);
+    m_graphEditor = new AutomatonGraphEditor;
+    m_graphEditor->setObjectName(QStringLiteral("interactiveGraphEditor"));
+    layout->addWidget(m_graphEditor, 1);
     auto* hint = new QLabel(tr(
-        "Задайте дуги графа строками. Для автомата Мура оставьте столбец выходов пустым: "
-        "выходы уже относятся к состояниям."));
+        "Двойной щелчок изменяет подпись вершины или дуги. Выберите исходную вершину, "
+        "затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. "
+        "Вершины можно перемещать, а дугу — перетаскивать для изменения изгиба. "
+        "Backspace/Delete удаляет выбранный элемент. Для Мили вершина подписывается «q1», "
+        "дуга — «x1 / y1» или «x2 / -». Для Мура вершина — «q1 / y1», дуга — «x1»."));
     hint->setWordWrap(true);
     layout->addWidget(hint);
     auto* accept = new QPushButton(tr("Принять граф"));
@@ -175,13 +170,13 @@ QWidget* AutomatonEditor::createGraphPage() {
     m_graphFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
     layout->addWidget(m_graphFeedback);
-    connect(add, &QPushButton::clicked, this, &AutomatonEditor::addGraphRow);
-    connect(remove, &QPushButton::clicked, this, [this] {
-        if (m_edgeTable->currentRow() >= 0)
-            m_edgeTable->removeRow(m_edgeTable->currentRow());
-    });
+    connect(add, &QPushButton::clicked, m_graphEditor,
+            &AutomatonGraphEditor::createVertex);
+    connect(remove, &QPushButton::clicked, m_graphEditor,
+            &AutomatonGraphEditor::deleteSelectedVertex);
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptGraph);
-    connect(m_edgeTable, &QTableWidget::itemChanged, this, [this] { invalidateGraph(); });
+    connect(m_graphEditor, &AutomatonGraphEditor::graphChanged,
+            this, &AutomatonEditor::invalidateGraph);
     return page;
 }
 
@@ -220,8 +215,7 @@ void AutomatonEditor::resetEditor() {
     m_matrixTable->clear();
     m_matrixTable->setRowCount(0);
     m_matrixTable->setColumnCount(0);
-    m_edgeTable->setRowCount(0);
-    m_canvas->clearAutomaton();
+    m_graphEditor->clearGraph();
     m_tableFeedback->clear();
     m_matrixFeedback->clear();
     m_graphFeedback->clear();
@@ -468,48 +462,102 @@ void AutomatonEditor::acceptMatrix() {
     if (!check.accepted) return;
     m_matrixAutomaton = actual;
     m_matrixAccepted = true;
+    m_graphEditor->setTemplate(m_tableAutomaton);
     m_tabs->setTabEnabled(2, true);
     m_tabs->setCurrentIndex(2);
-}
-
-void AutomatonEditor::addGraphRow() {
-    const int row = m_edgeTable->rowCount();
-    m_edgeTable->insertRow(row);
-    for (int column = 0; column < m_edgeTable->columnCount(); ++column)
-        m_edgeTable->setItem(row, column, new QTableWidgetItem);
 }
 
 bool AutomatonEditor::readGraph(Automaton* result, QString* error) const {
     if (!result || !m_tableAccepted) return false;
     Automaton parsed = m_tableAutomaton;
     parsed.transitions.clear();
-    for (int row = 0; row < m_edgeTable->rowCount(); ++row) {
-        const QString fromName = cellText(m_edgeTable, row, 0);
-        const QString inputName = cellText(m_edgeTable, row, 1);
-        const QString toName = cellText(m_edgeTable, row, 2);
-        const QString outputText = cellText(m_edgeTable, row, 3);
-        if (fromName.isEmpty() && inputName.isEmpty() && toName.isEmpty() && outputText.isEmpty())
-            continue;
-        const int from = parsed.states.indexOf(fromName);
-        const int input = parsed.inputs.indexOf(inputName);
-        const int to = parsed.states.indexOf(toName);
-        if (from < 0 || input < 0 || to < 0) {
-            if (error) *error = tr("Строка %1 содержит неизвестное состояние или вход.").arg(row + 1);
-            return false;
-        }
-        Transition edge{from, input, to, {}};
-        if (parsed.kind == AutomatonKind::Mealy) {
-            bool ok;
-            edge.outputs = parseOutputs(outputText, parsed, &ok);
-            if (!ok) {
-                if (error) *error = tr("Строка %1 содержит неизвестный выход.").arg(row + 1);
+    if (parsed.kind == AutomatonKind::Moore)
+        parsed.mooreOutputs = QVector<QSet<int>>(parsed.states.size());
+
+    QHash<int, int> stateByVertex;
+    QSet<int> representedStates;
+    for (const GraphVertexData& vertex : m_graphEditor->vertices()) {
+        QString stateName = vertex.label.trimmed();
+        QString outputText;
+        if (parsed.kind == AutomatonKind::Moore) {
+            const int slash = stateName.indexOf(QLatin1Char('/'));
+            if (slash < 0) {
+                if (error) *error = tr(
+                    "Вершина автомата Мура должна иметь подпись «состояние / выходы».");
                 return false;
             }
-        } else if (!outputText.isEmpty() && outputText != QStringLiteral("—")) {
-            if (error) *error = tr("У автомата Мура выход задаётся для состояния, а не дуги.");
+            outputText = stateName.mid(slash + 1).trimmed();
+            stateName = stateName.left(slash).trimmed();
+        }
+        const int state = parsed.states.indexOf(stateName);
+        if (state < 0) {
+            if (error) *error = tr("Вершина содержит неизвестное состояние «%1».").arg(stateName);
             return false;
         }
-        parsed.transitions.append(edge);
+        if (representedStates.contains(state)) {
+            if (error) *error = tr("Состояние «%1» представлено несколькими вершинами.").arg(stateName);
+            return false;
+        }
+        representedStates.insert(state);
+        stateByVertex.insert(vertex.id, state);
+        if (parsed.kind == AutomatonKind::Moore) {
+            bool ok;
+            parsed.mooreOutputs[state] = parseOutputs(outputText, parsed, &ok);
+            if (!ok) {
+                if (error) *error = tr("Вершина «%1» содержит неизвестный выход.").arg(stateName);
+                return false;
+            }
+        }
+    }
+    if (representedStates.size() != parsed.states.size()) {
+        if (error) *error = tr("На графе представлены не все состояния автомата.");
+        return false;
+    }
+
+    for (const GraphEdgeData& graphEdge : m_graphEditor->edges()) {
+        if (!stateByVertex.contains(graphEdge.fromId) ||
+            !stateByVertex.contains(graphEdge.toId)) {
+            if (error) *error = tr("Дуга ссылается на неизвестную вершину.");
+            return false;
+        }
+        const QStringList labels = graphEdge.label.split(
+            QRegularExpression(QStringLiteral("[;\\n]+")), Qt::SkipEmptyParts);
+        if (labels.isEmpty()) {
+            if (error) *error = tr("У каждой дуги должна быть подпись.");
+            return false;
+        }
+        for (const QString& rawLabel : labels) {
+            QString inputName = rawLabel.trimmed();
+            QString outputText;
+            if (parsed.kind == AutomatonKind::Mealy) {
+                const int slash = inputName.indexOf(QLatin1Char('/'));
+                if (slash < 0) {
+                    if (error) *error = tr("Дуга Мили должна иметь подпись «вход / выходы».");
+                    return false;
+                }
+                outputText = inputName.mid(slash + 1).trimmed();
+                inputName = inputName.left(slash).trimmed();
+            } else if (inputName.contains(QLatin1Char('/'))) {
+                if (error) *error = tr("На дуге автомата Мура указывается только вход.");
+                return false;
+            }
+            const int input = parsed.inputs.indexOf(inputName);
+            if (input < 0) {
+                if (error) *error = tr("Дуга содержит неизвестный вход «%1».").arg(inputName);
+                return false;
+            }
+            Transition edge{stateByVertex.value(graphEdge.fromId), input,
+                            stateByVertex.value(graphEdge.toId), {}};
+            if (parsed.kind == AutomatonKind::Mealy) {
+                bool ok;
+                edge.outputs = parseOutputs(outputText, parsed, &ok);
+                if (!ok) {
+                    if (error) *error = tr("Дуга содержит неизвестный выход.");
+                    return false;
+                }
+            }
+            parsed.transitions.append(edge);
+        }
     }
     if (!parsed.validate(error)) return false;
     *result = parsed;
@@ -525,7 +573,6 @@ void AutomatonEditor::acceptGraph() {
     }
     const CandidateCheck check = checkCandidate(actual);
     showFeedback(m_graphFeedback, check.explanation, check.accepted);
-    m_canvas->setAutomaton(actual);
     const bool wasComplete = m_graphAccepted;
     m_graphAccepted = check.accepted;
     if (check.accepted) m_graphAutomaton = actual;
@@ -603,7 +650,7 @@ QJsonObject AutomatonEditor::toJson() const {
     object.insert(QStringLiteral("table"), tableToJson(m_transitionTable));
     object.insert(QStringLiteral("matrixDimension"), m_matrixDimension->value());
     object.insert(QStringLiteral("matrix"), tableToJson(m_matrixTable));
-    object.insert(QStringLiteral("edges"), tableToJson(m_edgeTable));
+    object.insert(QStringLiteral("graph"), m_graphEditor->toJson());
     object.insert(QStringLiteral("tableAccepted"), m_tableAccepted);
     object.insert(QStringLiteral("matrixAccepted"), m_matrixAccepted);
     object.insert(QStringLiteral("graphAccepted"), m_graphAccepted);
@@ -641,15 +688,17 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
             checkCandidate(matrixAutomaton).accepted;
         if (m_matrixAccepted) {
             m_matrixAutomaton = matrixAutomaton;
+            m_graphEditor->setTemplate(m_tableAutomaton);
             m_tabs->setTabEnabled(2, true);
         }
     }
-    const QJsonArray edges = object.value(QStringLiteral("edges")).toArray();
-    m_loading = true;
-    m_edgeTable->setRowCount(edges.size());
-    ensureItems(m_edgeTable);
-    tableFromJson(m_edgeTable, edges);
-    m_loading = false;
+    QString graphLoadError;
+    if (m_matrixAccepted && object.value(QStringLiteral("graph")).isObject()) {
+        m_loading = true;
+        m_graphEditor->fromJson(object.value(QStringLiteral("graph")).toObject(),
+                                &graphLoadError);
+        m_loading = false;
+    }
     Automaton graphAutomaton;
     m_graphAccepted = m_matrixAccepted &&
         object.value(QStringLiteral("graphAccepted")).toBool() &&
@@ -657,7 +706,6 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
         checkCandidate(graphAutomaton).accepted;
     if (m_graphAccepted) {
         m_graphAutomaton = graphAutomaton;
-        m_canvas->setAutomaton(graphAutomaton);
     }
     emit completedChanged(m_graphAccepted);
 }
