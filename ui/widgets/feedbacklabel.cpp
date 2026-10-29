@@ -38,6 +38,7 @@ void FeedbackLabel::showMessage(const QString &text, UiFeedbackLevel level) {
     refreshStyle();
     refreshHeight();
     m_animation->start();
+    emit activeChanged(true);
 }
 
 void FeedbackLabel::updateMessageText(const QString &text) {
@@ -54,6 +55,7 @@ void FeedbackLabel::clearMessage() {
     clear();
     setStyleSheet({});
     refreshHeight();
+    emit activeChanged(false);
 }
 
 void FeedbackLabel::refreshStyle() {

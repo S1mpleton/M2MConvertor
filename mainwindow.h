@@ -11,6 +11,7 @@ class QAction;
 class QComboBox;
 class QLabel;
 class FeedbackLabel;
+class TaskImage;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
@@ -41,7 +42,8 @@ private:
     bool restoreProgress(const QJsonObject& data, const QString& progressPath);
     QJsonObject progressData() const;
     void createReport();
-    void setFeedback(FeedbackLabel* label, const QString& text, bool success);
+    void setFeedback(const QString& text, bool success);
+    QString reportHtml() const;
     void updateWorkflowState();
 
     QStackedWidget* m_pages;
@@ -53,21 +55,17 @@ private:
     QTabWidget* m_workflowTabs;
     QLabel* m_variantTitle;
     QLabel* m_directionLabel;
-    QLabel* m_diagramLabel;
+    TaskImage* m_diagramLabel;
     QSpinBox* m_stateCount;
     QSpinBox* m_inputCount;
     QSpinBox* m_outputCount;
-    FeedbackLabel* m_startFeedback;
     AutomatonEditor* m_sourceEditor;
     AutomatonEditor* m_targetEditor;
 
     QLineEdit* m_teacherName;
-    QLineEdit* m_teacherId;
     QLineEdit* m_studentName;
-    QLineEdit* m_studentId;
     QLineEdit* m_group;
     QLineEdit* m_recordBook;
-    FeedbackLabel* m_reportFeedback;
 
     FeedbackLabel* m_notification;
     QAction* m_saveAction;

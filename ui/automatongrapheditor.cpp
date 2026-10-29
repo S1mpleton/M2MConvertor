@@ -1,7 +1,4 @@
 #include "ui/automatongrapheditor.h"
-#include "ui/inputsyntax.h"
-#include <QDialogButtonBox>
-#include <QPushButton>
 
 #include <QEvent>
 #include <QGraphicsItem>
@@ -273,6 +270,7 @@ AutomatonGraphEditor::AutomatonGraphEditor(QWidget* parent)
     setRenderHint(QPainter::Antialiasing);
     setViewportUpdateMode(BoundingRectViewportUpdate);
     setDragMode(RubberBandDrag);
+    setResizeAnchor(QGraphicsView::AnchorViewCenter);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumHeight(380);
     m_scene->setSceneRect(-500, -350, 1000, 700);
@@ -396,34 +394,25 @@ void AutomatonGraphEditor::deleteLastVertex() {
 }
 
 namespace {
-QString editValidated(QWidget* parent, const QString& title, const QString& hint,
-                      const QString& initial, InputSyntax::Kind kind, bool* accepted) {
+QString editText(QWidget* parent, const QString& title, const QString& prompt,
+                 const QString& value, bool* accepted) {
     QInputDialog dialog(parent);
-    dialog.setWindowTitle(title); dialog.setLabelText(hint);
-    dialog.setInputMode(QInputDialog::TextInput);
+    dialog.setWindowTitle(title); dialog.setLabelText(prompt);
+    dialog.setInputMode(QInputDialog::TextInput); dialog.setTextValue(value);
     dialog.setOkButtonText(QObject::tr("Принять"));
     dialog.setCancelButtonText(QObject::tr("Отмена"));
-    dialog.setTextValue(InputSyntax::normalize(initial, kind));
-    auto* edit = dialog.findChild<QLineEdit*>();
-    auto* validator = new InputSyntax(kind, edit);
-    edit->setValidator(validator);
-    auto update = [&dialog, edit] {
-        if (auto* buttons = dialog.findChild<QDialogButtonBox*>())
-            buttons->button(QDialogButtonBox::Ok)->setEnabled(edit->hasAcceptableInput());
-    };
-    QObject::connect(edit, &QLineEdit::textChanged, &dialog, update);
-    dialog.show(); update();
     *accepted = dialog.exec() == QDialog::Accepted;
-    return edit->text();
+    return dialog.textValue();
 }
 }
+
 void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
     if (m_kind == AutomatonKind::Mealy) return; // State names are fixed by the task.
     bool accepted = false;
     const auto state = statePart(vertex->label());
-    const QString value = editValidated(this, tr("Выходы состояния %1").arg(state),
+    const QString value = editText(this, tr("Выходы состояния %1").arg(state),
         tr("Выходы y0…y9 через запятую, либо «-»:"),
-        vertex->label().section('/', 1).trimmed(), InputSyntax::Outputs, &accepted);
+        vertex->label().section('/', 1).trimmed(), &accepted);
     if (accepted) {
         vertex->setLabel(state + QStringLiteral(" / ") + (value.isEmpty() ? QStringLiteral("-") : value));
             updateSceneBounds();
@@ -436,9 +425,8 @@ void AutomatonGraphEditor::editEdge(GraphEdgeItem* edge) {
     const QString hint = m_kind == AutomatonKind::Mealy
         ? tr("Вход / выходы; например x1 / y1 или x1 / -; x2 / y2")
         : tr("Входы через запятую, например x1, x2");
-    const QString value = editValidated(this, tr("Подпись дуги"), hint,
-        edge->label(), m_kind == AutomatonKind::Moore ? InputSyntax::MooreEdges : InputSyntax::MealyEdges,
-        &accepted);
+    const QString value = editText(this, tr("Подпись дуги"), hint,
+        edge->label(), &accepted);
     if (accepted) {
         edge->setLabel(value);
         updateSceneBounds();
@@ -589,6 +577,7 @@ bool AutomatonGraphEditor::fromJson(const QJsonObject& object, QString* error) {
     }
     updatePalette();
     updateSceneBounds();
+    centerOn(m_scene->itemsBoundingRect().center());
     emit graphChanged();
     return true;
 }

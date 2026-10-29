@@ -9,7 +9,8 @@
 
 class AutomatonGraphEditor;
 class QLabel;
-class FeedbackLabel;
+class TaskImage;
+class CollapsiblePanel;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
@@ -28,6 +29,7 @@ public:
 
 signals:
     void completedChanged(bool completed);
+    void feedbackRequested(const QString& text, bool success);
 
 private:
     struct CandidateCheck {
@@ -42,6 +44,7 @@ private:
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, QString* error) const;
     void configureMatrix();
+    void updateReference(QTableWidget* table) const;
     bool readMatrix(Automaton* result, QString* error) const;
     bool readGraph(Automaton* result, QString* error) const;
     void acceptTable();
@@ -50,7 +53,7 @@ private:
     void invalidateFromTable();
     void invalidateFromMatrix();
     void invalidateGraph();
-    void showFeedback(FeedbackLabel* label, const QString& message, bool success);
+    void showFeedback(const QString& message, bool success);
     CandidateCheck checkCandidate(const Automaton& candidate, bool graph = false) const;
     QSet<int> parseOutputs(const QString& text, Automaton& automaton,
                            bool* ok) const;
@@ -67,21 +70,21 @@ private:
     bool m_graphAccepted = false;
     bool m_loading = false;
 
-    FeedbackLabel* m_notification;
     QTabWidget* m_tabs;
-    QLabel* m_assignmentImage;
+    TaskImage* m_assignmentImage;
+    CollapsiblePanel* m_assignmentPanel;
+    CollapsiblePanel* m_matrixPanel;
+    CollapsiblePanel* m_graphPanel;
+    QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
-    FeedbackLabel* m_tableFeedback;
 
     QLabel* m_matrixDimension;
     QLabel* m_outputCaption;
     QTableWidget* m_matrixOutputs;
     QTableWidget* m_matrixTable;
     QTableWidget* m_matrixReference;
-    FeedbackLabel* m_matrixFeedback;
 
     AutomatonGraphEditor* m_graphEditor;
-    FeedbackLabel* m_graphFeedback;
 };
 
 #endif

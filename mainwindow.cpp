@@ -3,6 +3,8 @@
 #include "infrastructure/progressstore.h"
 #include "ui/automatoneditor.h"
 #include "ui/widgets/feedbacklabel.h"
+#include "ui/widgets/taskimage.h"
+#include "ui/widgets/collapsiblepanel.h"
 #include "ui/workflowtabs.h"
 #include "ui/appicons.h"
 
@@ -61,6 +63,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_notification = new FeedbackLabel;
     m_notification->setObjectName("applicationNotification");
     statusBar()->addWidget(m_notification, 1);
+    connect(m_notification, &FeedbackLabel::activeChanged, statusBar(), &QWidget::setVisible);
+    statusBar()->hide();
+    for (auto* editor : {m_sourceEditor, m_targetEditor})
+        connect(editor, &AutomatonEditor::feedbackRequested, this, &MainWindow::setFeedback);
 }
 
 QWidget* MainWindow::createLandingPage() {
@@ -216,14 +222,10 @@ QWidget* MainWindow::createStartPage() {
 
     auto* splitter = new QSplitter(Qt::Horizontal);
     splitter->setChildrenCollapsible(false);
-    auto* assignmentGroup = new QGroupBox(tr("Задание варианта"));
-    auto* assignmentLayout = new QVBoxLayout(assignmentGroup);
-    m_diagramLabel = new QLabel(tr("В варианте отсутствует изображение"));
-    m_diagramLabel->setAlignment(Qt::AlignCenter);
-    m_diagramLabel->setMinimumSize(360, 300);
-    m_diagramLabel->setFrameShape(QFrame::StyledPanel);
-    m_diagramLabel->setFrameShadow(QFrame::Sunken);
-    assignmentLayout->addWidget(m_diagramLabel, 1);
+    m_diagramLabel = new TaskImage;
+    m_diagramLabel->setObjectName("startTaskImage");
+    auto* assignmentGroup = new CollapsiblePanel(tr("Задание варианта"), m_diagramLabel, "startAssignment");
+    assignmentGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     auto* workPanel = new QWidget;
     auto* right = new QVBoxLayout(workPanel);
@@ -253,10 +255,7 @@ QWidget* MainWindow::createStartPage() {
     accept->setObjectName(QStringLiteral("acceptCountsButton"));
     accept->setDefault(true);
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    m_startFeedback = new FeedbackLabel;
-    m_startFeedback->setWordWrap(true);
     countLayout->addRow(accept);
-    countLayout->addRow(m_startFeedback);
     right->addWidget(counts);
     right->addStretch();
     splitter->addWidget(assignmentGroup);
@@ -284,28 +283,21 @@ QWidget* MainWindow::createReportPage() {
     auto* teacher = new QGroupBox(tr("Преподаватель"));
     auto* teacherForm = new QFormLayout(teacher);
     m_teacherName = new QLineEdit;
-    m_teacherId = new QLineEdit;
     teacherForm->addRow(tr("Ф. И. О. преподавателя:"), m_teacherName);
-    teacherForm->addRow(tr("Идентификатор:"), m_teacherId);
     auto* student = new QGroupBox(tr("Студент"));
     auto* studentForm = new QFormLayout(student);
     m_studentName = new QLineEdit;
-    m_studentId = new QLineEdit;
     m_group = new QLineEdit;
     m_recordBook = new QLineEdit;
     studentForm->addRow(tr("Ф. И. О. студента:"), m_studentName);
-    studentForm->addRow(tr("Идентификатор:"), m_studentId);
     studentForm->addRow(tr("Группа:"), m_group);
     studentForm->addRow(tr("Номер зачётной книжки:"), m_recordBook);
     auto* create = new QPushButton(tr("Создать отчёт HTML…"));
     create->setObjectName(QStringLiteral("createReportButton"));
     create->setIcon(AppIcons::icon(AppIcons::Kind::Save));
-    m_reportFeedback = new FeedbackLabel;
-    m_reportFeedback->setWordWrap(true);
     layout->addWidget(teacher);
     layout->addWidget(student);
     layout->addWidget(create, 0, Qt::AlignCenter);
-    layout->addWidget(m_reportFeedback);
     layout->addStretch();
     connect(create, &QPushButton::clicked, this, &MainWindow::createReport);
     return page;
@@ -402,27 +394,17 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_variantTitle->setText(tr("Вариант №%1 — %2")
         .arg(variant.number).arg(conversionDirectionName(variant.direction)));
     m_directionLabel->setText(conversionDirectionName(variant.direction));
-    QPixmap diagram;
-    diagram.loadFromData(variant.diagram);
-    if (!diagram.isNull())
-        m_diagramLabel->setPixmap(diagram.scaled(m_diagramLabel->size(),
-                                                  Qt::KeepAspectRatio,
-                                                  Qt::SmoothTransformation));
-    else {
-        m_diagramLabel->setPixmap(QPixmap());
-        m_diagramLabel->setText(tr("Изображение задания отсутствует"));
-    }
-    m_startFeedback->clearMessage();
+    m_diagramLabel->setImageData(variant.diagram);
+    m_notification->clearMessage();
     m_stateCount->setValue(1);
     m_inputCount->setValue(1);
     m_outputCount->setValue(1);
     m_sourceEditor->setTask(variant, AutomatonKind::Moore);
     m_targetEditor->setTask(variant, AutomatonKind::Mealy);
     m_workflowTabs->setCurrentIndex(0);
-    m_teacherName->clear(); m_teacherId->clear();
-    m_studentName->clear(); m_studentId->clear();
+    m_teacherName->clear();
+    m_studentName->clear();
     m_group->clear(); m_recordBook->clear();
-    m_reportFeedback->clearMessage();
     m_saveAction->setEnabled(true);
     m_saveAsAction->setEnabled(true);
     updateWorkflowState();
@@ -437,13 +419,13 @@ void MainWindow::acceptCounts() {
                          m_outputCount->value() == source.outputs;
     if (!correct) {
         m_countsAccepted = false;
-        setFeedback(m_startFeedback,
+        setFeedback(
                     tr("Неверно. Введённые данные не соответствуют варианту."), false);
         updateWorkflowState();
         return;
     }
     m_countsAccepted = true;
-    setFeedback(m_startFeedback,
+    setFeedback(
                 tr("Верно. Введённые данные соответствуют варианту."), true);
     updateWorkflowState();
     m_workflowTabs->setCurrentIndex(1);
@@ -482,9 +464,7 @@ QJsonObject MainWindow::progressData() const {
     data.insert(QStringLiteral("target"), m_targetEditor->toJson());
     QJsonObject report;
     report.insert(QStringLiteral("teacherName"), m_teacherName->text());
-    report.insert(QStringLiteral("teacherId"), m_teacherId->text());
     report.insert(QStringLiteral("studentName"), m_studentName->text());
-    report.insert(QStringLiteral("studentId"), m_studentId->text());
     report.insert(QStringLiteral("group"), m_group->text());
     report.insert(QStringLiteral("recordBook"), m_recordBook->text());
     data.insert(QStringLiteral("report"), report);
@@ -564,9 +544,7 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
     m_targetEditor->fromJson(data.value(QStringLiteral("target")).toObject());
     const QJsonObject report = data.value(QStringLiteral("report")).toObject();
     m_teacherName->setText(report.value(QStringLiteral("teacherName")).toString());
-    m_teacherId->setText(report.value(QStringLiteral("teacherId")).toString());
     m_studentName->setText(report.value(QStringLiteral("studentName")).toString());
-    m_studentId->setText(report.value(QStringLiteral("studentId")).toString());
     m_group->setText(report.value(QStringLiteral("group")).toString());
     m_recordBook->setText(report.value(QStringLiteral("recordBook")).toString());
     m_progressPath = progressPath;
@@ -576,11 +554,10 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
 
 void MainWindow::createReport() {
     if (!m_targetEditor->completed()) return;
-    const QList<QLineEdit*> required = {m_teacherName, m_teacherId, m_studentName,
-                                        m_studentId, m_group, m_recordBook};
+    const QList<QLineEdit*> required = {m_teacherName, m_studentName, m_group, m_recordBook};
     for (QLineEdit* edit : required) {
         if (edit->text().trimmed().isEmpty()) {
-            setFeedback(m_reportFeedback, tr("Заполните все поля отчёта."), false);
+            setFeedback(tr("Заполните все поля отчёта."), false);
             edit->setFocus();
             return;
         }
@@ -591,46 +568,48 @@ void MainWindow::createReport() {
         tr("Отчёт HTML (*.html)"));
     if (path.isEmpty()) return;
     if (!path.endsWith(QStringLiteral(".html"), Qt::CaseInsensitive)) path += QStringLiteral(".html");
+    const QString html = reportHtml();
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) ||
+        file.write(html.toUtf8()) != html.toUtf8().size() || !file.commit()) {
+        setFeedback(tr("Не удалось сохранить отчёт: %1").arg(file.errorString()), false);
+        return;
+    }
+    setFeedback(tr("Отчёт создан: %1").arg(path), true);
+}
+
+QString MainWindow::reportHtml() const {
     QByteArray pngData;
     QBuffer imageBuffer(&pngData);
     imageBuffer.open(QIODevice::WriteOnly);
     QImage::fromData(m_currentVariant.diagram).save(&imageBuffer, "PNG");
     const QString image = QString::fromLatin1(pngData.toBase64());
     const QString mime = QStringLiteral("image/png");
-    const QString html = QStringLiteral(
+    return QStringLiteral(
         "<!doctype html><html lang='ru'><meta charset='utf-8'><title>Отчёт M2MConvertor</title>"
         "<style>body{font:16px sans-serif;max-width:900px;margin:40px auto;color:#172033}"
         "table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:7px}img{max-width:100%}</style>"
         "<h1>Преобразование эквивалентных автоматов</h1>"
         "<p><b>Вариант:</b> №%1<br><b>Направление:</b> %2<br><b>Дата:</b> %3</p>"
-        "<h2>Участники</h2><table><tr><th>Роль</th><th>Ф. И. О.</th><th>Идентификатор</th></tr>"
-        "<tr><td>Преподаватель</td><td>%4</td><td>%5</td></tr>"
-        "<tr><td>Студент</td><td>%6</td><td>%7</td></tr></table>"
-        "<p><b>Группа:</b> %8<br><b>Зачётная книжка:</b> %9</p>"
-        "<h2>Результат</h2><p>%10</p><p>%11</p>"
+        "<h2>Участники</h2><table><tr><th>Роль</th><th>Ф. И. О.</th></tr>"
+        "<tr><td>Преподаватель</td><td>%4</td></tr>"
+        "<tr><td>Студент</td><td>%5</td></tr></table>"
+        "<p><b>Группа:</b> %6<br><b>Зачётная книжка:</b> %7</p>"
+        "<h2>Результат</h2><p>%8</p><p>%9</p>"
         "<p><b>Проверка:</b> таблица, матрица и граф обоих автоматов приняты; "
         "реакция каждого введённого автомата из a0 совпадает с реакцией варианта. "
         "Проверена заданная последовательность входов; эквивалентность на всех "
         "возможных последовательностях этой проверкой не устанавливается.</p>"
-        "<h2>Задание</h2><img src='data:%12;base64,%13'></html>")
+        "<h2>Задание</h2><img src='data:%10;base64,%11'></html>")
         .arg(m_currentVariant.number)
         .arg(conversionDirectionName(m_currentVariant.direction).toHtmlEscaped())
         .arg(QDateTime::currentDateTime().toString(Qt::ISODate).toHtmlEscaped())
-        .arg(m_teacherName->text().toHtmlEscaped(), m_teacherId->text().toHtmlEscaped(),
-             m_studentName->text().toHtmlEscaped(), m_studentId->text().toHtmlEscaped(),
+        .arg(m_teacherName->text().toHtmlEscaped(), m_studentName->text().toHtmlEscaped(),
              m_group->text().toHtmlEscaped(), m_recordBook->text().toHtmlEscaped(),
              automatonSummary(m_sourceEditor->acceptedAutomaton()).toHtmlEscaped(),
              automatonSummary(m_targetEditor->acceptedAutomaton()).toHtmlEscaped(), mime, image);
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly) ||
-        file.write(html.toUtf8()) != html.toUtf8().size() || !file.commit()) {
-        setFeedback(m_reportFeedback, tr("Не удалось сохранить отчёт: %1").arg(file.errorString()), false);
-        return;
-    }
-    setFeedback(m_reportFeedback, tr("Отчёт создан: %1").arg(path), true);
 }
 
-void MainWindow::setFeedback(FeedbackLabel* label, const QString& text, bool success) {
-    label->showMessage(text, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
-    if (success) m_notification->showMessage(text, UiFeedbackLevel::Success);
+void MainWindow::setFeedback(const QString& text, bool success) {
+    m_notification->showMessage(text, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
 }

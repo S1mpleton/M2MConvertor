@@ -19,7 +19,8 @@ target_include_directories(M2MConvertorCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(M2MConvertorCore PUBLIC Qt::Core Qt::Gui OpenSSL::Crypto)
 
 add_library(M2MConvertorUi STATIC
-    ui/inputsyntax.cpp ui/inputsyntax.h ui/workflowtabs.h
+    ui/mealycelldelegate.cpp ui/mealycelldelegate.h
+    ui/widgets/taskimage.h ui/widgets/collapsiblepanel.h ui/workflowtabs.h
     ui/appicons.cpp ui/appicons.h ui/widgets/feedbacklabel.cpp ui/widgets/feedbacklabel.h
     ui/widgets/wrappinglabel.cpp ui/widgets/wrappinglabel.h
     mainwindow.cpp mainwindow.h

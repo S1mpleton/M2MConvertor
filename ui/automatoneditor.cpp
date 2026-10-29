@@ -2,10 +2,12 @@
 
 #include "domain/reactionchecker.h"
 #include "ui/automatongrapheditor.h"
-#include "ui/inputsyntax.h"
+#include "ui/mealycelldelegate.h"
+#include "ui/widgets/taskimage.h"
+#include "ui/widgets/wrappinglabel.h"
+#include "ui/widgets/collapsiblepanel.h"
 #include "ui/appicons.h"
 #include "ui/workflowtabs.h"
-#include "ui/widgets/feedbacklabel.h"
 
 #include <QGroupBox>
 #include <QHeaderView>
@@ -42,8 +44,6 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
     m_tabs->setTabEnabled(1, false);
     m_tabs->setTabEnabled(2, false);
     layout->addWidget(m_tabs);
-    m_notification = new FeedbackLabel;
-    layout->addWidget(m_notification);
 }
 
 QWidget* AutomatonEditor::createTablePage() {
@@ -51,24 +51,19 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(10);
-    m_assignmentImage = new QLabel;
-    m_assignmentImage->setAlignment(Qt::AlignCenter);
-    m_assignmentImage->setMaximumHeight(160);
-    m_assignmentImage->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    layout->addWidget(m_assignmentImage);
+    m_assignmentImage = new TaskImage;
+    m_assignmentImage->setObjectName("tableTaskImage");
+    m_assignmentPanel = new CollapsiblePanel(tr("Задание варианта"), m_assignmentImage, "tableAssignment");
+    layout->addWidget(m_assignmentPanel);
     m_transitionTable = new QTableWidget;
     m_transitionTable->setObjectName("transitionTable");
     m_transitionTable->setAlternatingRowColors(true);
     m_transitionTable->horizontalHeader()->hide();
     m_transitionTable->verticalHeader()->hide();
-    m_transitionTable->setItemDelegate(new SyntaxDelegate([this](const QModelIndex& index) {
-        if (index.column() == 0) return InputSyntax::Input;
-        if (m_editorKind == AutomatonKind::Moore && index.row() == 1) return InputSyntax::Outputs;
-        return m_editorKind == AutomatonKind::Moore ? InputSyntax::StateName : InputSyntax::MealyCell;
-    }, m_transitionTable));
     m_transitionTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     layout->addWidget(m_transitionTable, 1);
-    auto* hint = new QLabel(tr(
+    auto* hint = new WrappingLabel;
+    hint->setText(tr(
         "Мили: ячейка «следующее состояние / выход1, выход2». "
         "Мура: выходы над состояниями. Введите входы x0…x9 слева; «-» означает отсутствие перехода или выхода."));
     hint->setWordWrap(true);
@@ -76,12 +71,7 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* accept = new QPushButton(tr("Принять таблицу"));
     accept->setObjectName(QStringLiteral("acceptTableButton"));
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    m_tableFeedback = new FeedbackLabel;
-    m_tableFeedback->setObjectName("tableFeedback");
-    m_tableFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
-    m_tableFeedback->setParent(page);
-    m_tableFeedback->hide();
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptTable);
     connect(m_transitionTable, &QTableWidget::itemChanged, this, [this] { invalidateFromTable(); });
     return page;
@@ -92,17 +82,10 @@ QWidget* AutomatonEditor::createMatrixPage() {
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(10);
-    auto* referenceGroup = new QGroupBox(tr("Принятая таблица автомата"));
-    auto* referenceLayout = new QVBoxLayout(referenceGroup);
     m_matrixReference = new QTableWidget;
-    m_matrixReference->horizontalHeader()->hide();
-    m_matrixReference->verticalHeader()->hide();
-    m_matrixReference->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_matrixReference->setFocusPolicy(Qt::NoFocus);
-    m_matrixReference->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_matrixReference->setMaximumHeight(175);
-    referenceLayout->addWidget(m_matrixReference);
-    layout->addWidget(referenceGroup);
+    m_matrixReference->setObjectName("matrixReference");
+    m_matrixPanel = new CollapsiblePanel(tr("Принятая таблица автомата"), m_matrixReference, "matrixHint");
+    layout->addWidget(m_matrixPanel);
     auto* row = new QHBoxLayout;
     m_matrixDimension = new QLabel;
     auto* create = new QPushButton(tr("Очистить матрицу"));
@@ -115,9 +98,6 @@ QWidget* AutomatonEditor::createMatrixPage() {
     layout->addLayout(row);
     m_matrixTable = new QTableWidget;
     m_matrixTable->setObjectName("transitionMatrix");
-    m_matrixTable->setItemDelegate(new SyntaxDelegate([this](const QModelIndex&) {
-        return m_editorKind == AutomatonKind::Moore ? InputSyntax::MooreEdges : InputSyntax::MealyEdges;
-    }, m_matrixTable));
     m_matrixTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_matrixTable->verticalHeader()->setDefaultSectionSize(36);
     m_matrixTable->setAlternatingRowColors(true);
@@ -126,7 +106,6 @@ QWidget* AutomatonEditor::createMatrixPage() {
     tables->addWidget(m_matrixTable, 3);
     m_matrixOutputs = new QTableWidget;
     m_matrixOutputs->setObjectName("matrixOutputs");
-    m_matrixOutputs->setItemDelegate(new SyntaxDelegate([](const QModelIndex&) { return InputSyntax::Outputs; }, m_matrixOutputs));
     m_matrixOutputs->setColumnCount(2);
     m_matrixOutputs->setHorizontalHeaderLabels({tr("Состояние"), tr("Выходные сигналы")});
     m_matrixOutputs->verticalHeader()->hide();
@@ -138,7 +117,8 @@ QWidget* AutomatonEditor::createMatrixPage() {
     tables->addWidget(m_outputCaption);
     tables->addWidget(m_matrixOutputs, 1);
     layout->addLayout(tables, 1);
-    auto* hint = new QLabel(tr(
+    auto* hint = new WrappingLabel;
+    hint->setText(tr(
         "В каждой ячейке укажите метки дуг через «;». Для Мили: «вход / выход1,выход2»; "
         "для Мура: «x1, x2». Строка — откуда, столбец — куда. Выходы Мура заполните в таблице справа."));
     hint->setWordWrap(true);
@@ -146,12 +126,7 @@ QWidget* AutomatonEditor::createMatrixPage() {
     auto* accept = new QPushButton(tr("Принять матрицу"));
     accept->setObjectName("acceptMatrixButton");
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    m_matrixFeedback = new FeedbackLabel;
-    m_matrixFeedback->setObjectName("matrixFeedback");
-    m_matrixFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
-    m_matrixFeedback->setParent(page);
-    m_matrixFeedback->hide();
     connect(create, &QPushButton::clicked, this, &AutomatonEditor::configureMatrix);
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptMatrix);
     connect(m_matrixTable, &QTableWidget::itemChanged, this, [this] { invalidateFromMatrix(); });
@@ -164,6 +139,10 @@ QWidget* AutomatonEditor::createGraphPage() {
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(10);
+    m_graphReference = new QTableWidget;
+    m_graphReference->setObjectName("graphReference");
+    m_graphPanel = new CollapsiblePanel(tr("Принятая таблица автомата"), m_graphReference, "graphHint");
+    layout->addWidget(m_graphPanel);
     auto* buttons = new QHBoxLayout;
     auto* add = new QPushButton(tr("Создать вершину"));
     add->setObjectName(QStringLiteral("createVertexButton"));
@@ -177,6 +156,7 @@ QWidget* AutomatonEditor::createGraphPage() {
     layout->addLayout(buttons);
     m_graphEditor = new AutomatonGraphEditor;
     m_graphEditor->setObjectName(QStringLiteral("interactiveGraphEditor"));
+    m_graphEditor->setMinimumHeight(180);
     remove->setEnabled(false);
     connect(m_graphEditor, &AutomatonGraphEditor::graphChanged, this, [this, add, remove] {
         const int count = m_graphEditor->vertices().size();
@@ -184,7 +164,9 @@ QWidget* AutomatonEditor::createGraphPage() {
         remove->setEnabled(count > 0);
     });
     layout->addWidget(m_graphEditor, 1);
-    auto* hint = new QLabel(tr(
+    auto* hint = new WrappingLabel;
+    hint->setObjectName("graphInstructions");
+    hint->setText(tr(
         "Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Можно создать до 10 состояний a0…a9. Выберите исходную вершину, "
         "затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. "
         "Вершины можно перемещать, а дугу — перетаскивать для изменения изгиба. "
@@ -195,12 +177,7 @@ QWidget* AutomatonEditor::createGraphPage() {
     auto* accept = new QPushButton(tr("Принять граф"));
     accept->setObjectName("acceptGraphButton");
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    m_graphFeedback = new FeedbackLabel;
-    m_graphFeedback->setObjectName("graphFeedback");
-    m_graphFeedback->setWordWrap(true);
     layout->addWidget(accept, 0, Qt::AlignRight);
-    m_graphFeedback->setParent(page);
-    m_graphFeedback->hide();
     connect(add, &QPushButton::clicked, m_graphEditor,
             &AutomatonGraphEditor::createVertex);
     connect(remove, &QPushButton::clicked, m_graphEditor,
@@ -214,21 +191,17 @@ QWidget* AutomatonEditor::createGraphPage() {
 void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
     m_task = task;
     m_editorKind = kind;
+    m_assignmentPanel->setExpanded(true); m_matrixPanel->setExpanded(true); m_graphPanel->setExpanded(true);
     resetEditor();
     const auto& counts = task.counts(kind);
     m_matrixDimension->setText(tr("%1 × %1").arg(counts.states));
     m_matrixOutputs->setVisible(kind == AutomatonKind::Moore);
     m_outputCaption->setVisible(kind == AutomatonKind::Moore);
-    QPixmap diagram;
-    diagram.loadFromData(task.diagram);
-    m_assignmentImage->setPixmap(diagram.scaled(900, 160, Qt::KeepAspectRatio,
-                                                 Qt::SmoothTransformation));
-    m_assignmentImage->setVisible(!diagram.isNull());
+    m_assignmentImage->setImageData(task.diagram);
 }
 
 void AutomatonEditor::resetEditor() {
     m_loading = true;
-    m_notification->clearMessage();
     configureTable();
     m_matrixTable->clear();
     m_matrixTable->setRowCount(0);
@@ -236,14 +209,10 @@ void AutomatonEditor::resetEditor() {
     m_matrixOutputs->setRowCount(0);
     m_matrixReference->setRowCount(0);
     m_matrixReference->setColumnCount(0);
+    m_graphReference->setRowCount(0);
+    m_graphReference->setColumnCount(0);
     m_graphEditor->clearGraph();
-    m_tableFeedback->clearMessage();
-    m_matrixFeedback->clearMessage();
-    m_graphFeedback->clearMessage();
     m_tableAccepted = m_matrixAccepted = m_graphAccepted = false;
-    m_tableFeedback->clearMessage();
-    m_matrixFeedback->clearMessage();
-    m_graphFeedback->clearMessage();
     m_tabs->setTabEnabled(1, false);
     m_tabs->setTabEnabled(2, false);
     m_tabs->setCurrentIndex(0);
@@ -260,10 +229,15 @@ void AutomatonEditor::configureTable() {
     m_transitionTable->setColumnCount(counts.states + 1);
     m_transitionTable->setRowCount(firstInputRow() + counts.inputs);
     const bool moore = m_editorKind == AutomatonKind::Moore;
+    // Reset the delegate when switching between Moore and Mealy variants.
+    auto* oldDelegate = m_transitionTable->itemDelegate();
+    m_transitionTable->setItemDelegate(moore ? new QStyledItemDelegate(m_transitionTable)
+                                            : new MealyCellDelegate(m_transitionTable));
+    if (oldDelegate && oldDelegate->parent() == m_transitionTable) oldDelegate->deleteLater();
     for (int row = 0; row < m_transitionTable->rowCount(); ++row) {
         for (int col = 0; col < m_transitionTable->columnCount(); ++col) {
             const bool editable = row >= firstInputRow() || (moore && row == 1 && col > 0);
-            auto* item = new QTableWidgetItem(editable ? "-" : "");
+            auto* item = new QTableWidgetItem(editable ? (!moore && row >= firstInputRow() && col > 0 ? "-/-" : "-") : "");
             if (row >= firstInputRow() && col == 0) item->setText("");
             item->setTextAlignment(Qt::AlignCenter);
             if (!editable) {
@@ -346,12 +320,17 @@ bool AutomatonEditor::readTable(Automaton* result, QString* error) const {
             QString outputPart;
             if (parsed.kind == AutomatonKind::Mealy) {
                 const int slash = text.indexOf(QLatin1Char('/'));
-                if (slash < 0) {
+                if (slash < 0 || text.count('/') != 1) {
                     if (error) *error = tr("Для перехода Мили укажите «состояние / выход». ");
                     return false;
                 }
                 destination = text.left(slash).trimmed();
                 outputPart = text.mid(slash + 1).trimmed();
+                if (destination == "-" || destination == QStringLiteral("—")) {
+                    if (outputPart.isEmpty() || outputPart == "-" || outputPart == QStringLiteral("—")) continue;
+                    if (error) *error = tr("Без следующего состояния выходы не задаются. Для отсутствия перехода используйте -/-.");
+                    return false;
+                }
             }
             const int to = parsed.states.indexOf(destination.trimmed());
             if (to < 0) {
@@ -376,14 +355,15 @@ bool AutomatonEditor::readTable(Automaton* result, QString* error) const {
 }
 
 void AutomatonEditor::acceptTable() {
+    m_transitionTable->setFocus();
     Automaton actual;
     QString error;
     if (!readTable(&actual, &error)) {
-        showFeedback(m_tableFeedback, error, false);
+        showFeedback(error, false);
         return;
     }
     const CandidateCheck check = checkCandidate(actual);
-    showFeedback(m_tableFeedback, check.explanation, check.accepted);
+    showFeedback(check.explanation, check.accepted);
     if (!check.accepted) return;
     const bool alreadyAccepted = m_tableAccepted;
     m_tableAutomaton = actual;
@@ -393,27 +373,38 @@ void AutomatonEditor::acceptTable() {
     m_tabs->setCurrentIndex(1);
 }
 
-void AutomatonEditor::configureMatrix() {
-    if (!m_tableAccepted) return;
-    m_matrixReference->setRowCount(m_transitionTable->rowCount());
-    m_matrixReference->setColumnCount(m_transitionTable->columnCount());
+void AutomatonEditor::updateReference(QTableWidget* table) const {
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setFocusPolicy(Qt::NoFocus);
+    table->horizontalHeader()->hide(); table->verticalHeader()->hide();
+    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    table->setMaximumHeight(175);
+    table->setRowCount(m_transitionTable->rowCount());
+    table->setColumnCount(m_transitionTable->columnCount());
+    table->setFixedHeight(qMin(175, table->rowCount() * table->verticalHeader()->defaultSectionSize() + 2));
     for (int row = 0; row < m_transitionTable->rowCount(); ++row) {
         for (int col = 0; col < m_transitionTable->columnCount(); ++col)
-            m_matrixReference->setItem(row, col, m_transitionTable->item(row, col)->clone());
+            table->setItem(row, col, m_transitionTable->item(row, col)->clone());
     }
-    m_matrixReference->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
-    m_matrixReference->setColumnWidth(0, m_transitionTable->columnWidth(0));
-    m_matrixReference->clearSpans();
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    table->setColumnWidth(0, m_transitionTable->columnWidth(0));
+    table->clearSpans();
     for (int row = 0; row < firstInputRow(); ++row)
         for (int col = 0; col < m_transitionTable->columnCount(); ++col)
             if ((col == 0 && row == 0) || (col == 1 && row == firstInputRow() - 2) ||
                 (m_editorKind == AutomatonKind::Moore && col == 1 && row == 0))
                 if (m_transitionTable->rowSpan(row, col) > 1 || m_transitionTable->columnSpan(row, col) > 1)
-                    m_matrixReference->setSpan(row, col, m_transitionTable->rowSpan(row, col),
+                    table->setSpan(row, col, m_transitionTable->rowSpan(row, col),
                                                m_transitionTable->columnSpan(row, col));
+}
+
+void AutomatonEditor::configureMatrix() {
+    if (!m_tableAccepted) return;
+    updateReference(m_matrixReference);
+    updateReference(m_graphReference);
     const int size = m_task.counts(m_editorKind).states;
     if (qint64(size) * size > 250000) {
-        showFeedback(m_matrixFeedback, tr("Матрица слишком велика для редактора (более 250 000 ячеек)."), false);
+        showFeedback(tr("Матрица слишком велика для редактора (более 250 000 ячеек)."), false);
         return;
     }
     m_loading = true;
@@ -506,14 +497,15 @@ bool AutomatonEditor::readMatrix(Automaton* result, QString* error) const {
 }
 
 void AutomatonEditor::acceptMatrix() {
+    m_matrixTable->setFocus();
     Automaton actual;
     QString error;
     if (!readMatrix(&actual, &error)) {
-        showFeedback(m_matrixFeedback, error, false);
+        showFeedback(error, false);
         return;
     }
     const CandidateCheck check = checkCandidate(actual);
-    showFeedback(m_matrixFeedback, check.explanation, check.accepted);
+    showFeedback(check.explanation, check.accepted);
     if (!check.accepted) return;
     m_matrixAutomaton = actual;
     m_matrixAccepted = true;
@@ -628,11 +620,11 @@ void AutomatonEditor::acceptGraph() {
     Automaton actual;
     QString error;
     if (!readGraph(&actual, &error)) {
-        showFeedback(m_graphFeedback, error, false);
+        showFeedback(error, false);
         return;
     }
     const CandidateCheck check = checkCandidate(actual, true);
-    showFeedback(m_graphFeedback, check.explanation, check.accepted);
+    showFeedback(check.explanation, check.accepted);
     const bool wasComplete = m_graphAccepted;
     m_graphAccepted = check.accepted;
     if (check.accepted) m_graphAutomaton = actual;
@@ -643,9 +635,6 @@ void AutomatonEditor::invalidateFromTable() {
     if (m_loading) return;
     const bool wasComplete = m_graphAccepted;
     m_tableAccepted = m_matrixAccepted = m_graphAccepted = false;
-    m_tableFeedback->clearMessage();
-    m_matrixFeedback->clearMessage();
-    m_graphFeedback->clearMessage();
     m_tabs->setTabEnabled(1, false);
     m_tabs->setTabEnabled(2, false);
     if (wasComplete) emit completedChanged(false);
@@ -655,8 +644,6 @@ void AutomatonEditor::invalidateFromMatrix() {
     if (m_loading) return;
     const bool wasComplete = m_graphAccepted;
     m_matrixAccepted = m_graphAccepted = false;
-    m_matrixFeedback->clearMessage();
-    m_graphFeedback->clearMessage();
     m_tabs->setTabEnabled(2, false);
     if (wasComplete) emit completedChanged(false);
 }
@@ -665,13 +652,11 @@ void AutomatonEditor::invalidateGraph() {
     if (m_loading) return;
     const bool wasComplete = m_graphAccepted;
     m_graphAccepted = false;
-    m_graphFeedback->clearMessage();
     if (wasComplete) emit completedChanged(false);
 }
 
-void AutomatonEditor::showFeedback(FeedbackLabel* label, const QString& message, bool success) {
-    label->showMessage(message, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
-    m_notification->showMessage(message, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
+void AutomatonEditor::showFeedback(const QString& message, bool success) {
+    emit feedbackRequested(message, success);
 }
 
 AutomatonEditor::CandidateCheck
@@ -703,6 +688,8 @@ void AutomatonEditor::tableFromJson(QTableWidget* table, const QJsonArray& rows)
 QJsonObject AutomatonEditor::toJson() const {
     QJsonObject object;
     object.insert("tableLayout", 3);
+    object.insert("hints", QJsonObject{{"assignment", m_assignmentPanel->expanded()},
+                                      {"matrix", m_matrixPanel->expanded()}, {"graph", m_graphPanel->expanded()}});
     object.insert(QStringLiteral("table"), tableToJson(m_transitionTable));
     object.insert(QStringLiteral("matrixOutputs"), tableToJson(m_matrixOutputs));
     object.insert(QStringLiteral("matrix"), tableToJson(m_matrixTable));
@@ -715,6 +702,10 @@ QJsonObject AutomatonEditor::toJson() const {
 
 void AutomatonEditor::fromJson(const QJsonObject& object) {
     resetEditor();
+    const auto hints = object.value("hints").toObject();
+    m_assignmentPanel->setExpanded(hints.value("assignment").toBool(true));
+    m_matrixPanel->setExpanded(hints.value("matrix").toBool(true));
+    m_graphPanel->setExpanded(hints.value("graph").toBool(true));
     m_loading = true;
     if (object.value("tableLayout").toInt() == 3) {
         tableFromJson(m_transitionTable, object.value("table").toArray());

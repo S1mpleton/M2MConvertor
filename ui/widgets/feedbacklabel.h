@@ -14,6 +14,7 @@ class FeedbackLabel : public WrappingLabel {
     void clearMessage();
   signals:
     void expired();
+    void activeChanged(bool active);
   protected:
     bool eventFilter(QObject *object, QEvent *event) override;
 
