@@ -2,6 +2,9 @@
 
 #include "infrastructure/progressstore.h"
 #include "ui/automatoneditor.h"
+#include "ui/widgets/feedbacklabel.h"
+#include "ui/workflowtabs.h"
+#include "ui/appicons.h"
 
 #include <QAction>
 #include <QBuffer>
@@ -55,6 +58,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_pages->addWidget(createWorkspacePage());
     setCentralWidget(m_pages);
     createMenus();
+    m_notification = new FeedbackLabel;
+    m_notification->setObjectName("applicationNotification");
+    statusBar()->addWidget(m_notification, 1);
 }
 
 QWidget* MainWindow::createLandingPage() {
@@ -98,7 +104,7 @@ QWidget* MainWindow::createLandingPage() {
     m_archivePathLabel->setWordWrap(true);
     auto* archiveButton = new QPushButton(tr("Открыть BazaVar…"));
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
-    archiveButton->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     archiveRow->addWidget(m_archivePathLabel, 1);
     archiveRow->addWidget(archiveButton);
     archiveLayout->addLayout(archiveRow);
@@ -139,10 +145,10 @@ QWidget* MainWindow::createLandingPage() {
     m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
     m_beginButton->setEnabled(false);
     m_beginButton->setDefault(true);
-    m_beginButton->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+    m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
     auto* openProgressButton = new QPushButton(tr("Открыть сохранённую работу…"));
     openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
-    openProgressButton->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    openProgressButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     actions->addStretch();
     actions->addWidget(m_beginButton);
     actions->addWidget(openProgressButton);
@@ -160,8 +166,8 @@ QWidget* MainWindow::createWorkspacePage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
     auto* top = new QHBoxLayout;
-    auto* back = new QPushButton(tr("← К выбору варианта"));
-    back->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    auto* back = new QPushButton(tr("К выбору варианта"));
+    back->setIcon(AppIcons::icon(AppIcons::Kind::Back));
     m_variantTitle = new QLabel;
     QFont font = m_variantTitle->font();
     font.setPointSize(13);
@@ -171,7 +177,7 @@ QWidget* MainWindow::createWorkspacePage() {
     top->addWidget(m_variantTitle);
     top->addStretch();
     layout->addLayout(top);
-    m_workflowTabs = new QTabWidget;
+    m_workflowTabs = new WorkflowTabs;
     m_workflowTabs->setObjectName(QStringLiteral("workflowTabs"));
     m_workflowTabs->addTab(createStartPage(), tr("Начало работы"));
     m_sourceEditor = new AutomatonEditor;
@@ -246,8 +252,8 @@ QWidget* MainWindow::createStartPage() {
     auto* accept = new QPushButton(tr("Принять"));
     accept->setObjectName(QStringLiteral("acceptCountsButton"));
     accept->setDefault(true);
-    accept->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
-    m_startFeedback = new QLabel;
+    accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
+    m_startFeedback = new FeedbackLabel;
     m_startFeedback->setWordWrap(true);
     countLayout->addRow(accept);
     countLayout->addRow(m_startFeedback);
@@ -293,8 +299,8 @@ QWidget* MainWindow::createReportPage() {
     studentForm->addRow(tr("Номер зачётной книжки:"), m_recordBook);
     auto* create = new QPushButton(tr("Создать отчёт HTML…"));
     create->setObjectName(QStringLiteral("createReportButton"));
-    create->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
-    m_reportFeedback = new QLabel;
+    create->setIcon(AppIcons::icon(AppIcons::Kind::Save));
+    m_reportFeedback = new FeedbackLabel;
     m_reportFeedback->setWordWrap(true);
     layout->addWidget(teacher);
     layout->addWidget(student);
@@ -306,17 +312,18 @@ QWidget* MainWindow::createReportPage() {
 }
 
 void MainWindow::createMenus() {
-    auto* file = menuBar()->addMenu(tr("Файл"));
-    auto* newWork = file->addAction(style()->standardIcon(QStyle::SP_FileDialogNewFolder),
+    AppIcons::configureMenuBar(menuBar());
+    auto* file = menuBar()->addMenu(AppIcons::icon(AppIcons::Kind::File), tr("Файл"));
+    auto* newWork = file->addAction(AppIcons::icon(AppIcons::Kind::New),
                                     tr("Выбрать другой вариант"));
-    auto* open = file->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
+    auto* open = file->addAction(AppIcons::icon(AppIcons::Kind::Open),
                                  tr("Открыть работу…"));
-    m_saveAction = file->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+    m_saveAction = file->addAction(AppIcons::icon(AppIcons::Kind::Save),
                                    tr("Сохранить работу"));
-    m_saveAsAction = file->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+    m_saveAsAction = file->addAction(AppIcons::icon(AppIcons::Kind::Save),
                                      tr("Сохранить работу как…"));
     file->addSeparator();
-    auto* quit = file->addAction(tr("Выход"));
+    auto* quit = file->addAction(AppIcons::icon(AppIcons::Kind::Exit), tr("Выход"));
     m_saveAction->setEnabled(false);
     m_saveAsAction->setEnabled(false);
     connect(newWork, &QAction::triggered, this, &MainWindow::returnToLanding);
@@ -336,12 +343,11 @@ bool MainWindow::loadArchive(const QString& path, bool showErrors) {
     QList<TrainingVariant> variants;
     QString error;
     if (!VariantArchive::load(path, &variants, &error)) {
-        if (showErrors) QMessageBox::critical(this, tr("Не удалось открыть BazaVar"), error);
+        if (showErrors) m_notification->showMessage(error, UiFeedbackLevel::Error);
         return false;
     }
     if (variants.isEmpty()) {
-        if (showErrors) QMessageBox::warning(this, tr("Пустая база"),
-                                             tr("В BazaVar нет вариантов."));
+        if (showErrors) m_notification->showMessage(tr("В BazaVar нет вариантов."), UiFeedbackLevel::Warning);
         return false;
     }
     m_archivePath = QFileInfo(path).absoluteFilePath();
@@ -406,7 +412,7 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
         m_diagramLabel->setPixmap(QPixmap());
         m_diagramLabel->setText(tr("Изображение задания отсутствует"));
     }
-    m_startFeedback->clear();
+    m_startFeedback->clearMessage();
     m_stateCount->setValue(1);
     m_inputCount->setValue(1);
     m_outputCount->setValue(1);
@@ -416,7 +422,7 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_teacherName->clear(); m_teacherId->clear();
     m_studentName->clear(); m_studentId->clear();
     m_group->clear(); m_recordBook->clear();
-    m_reportFeedback->clear();
+    m_reportFeedback->clearMessage();
     m_saveAction->setEnabled(true);
     m_saveAsAction->setEnabled(true);
     updateWorkflowState();
@@ -499,11 +505,11 @@ void MainWindow::saveProgress(bool saveAs) {
     }
     QString error;
     if (!ProgressStore::save(path, progressData(), &error)) {
-        QMessageBox::critical(this, tr("Ошибка сохранения"), error);
+        m_notification->showMessage(error, UiFeedbackLevel::Error);
         return;
     }
     m_progressPath = path;
-    statusBar()->showMessage(tr("Работа сохранена: %1").arg(QFileInfo(path).fileName()), 5000);
+    m_notification->showMessage(tr("Работа сохранена: %1").arg(QFileInfo(path).fileName()), UiFeedbackLevel::Success);
 }
 
 void MainWindow::openProgress() {
@@ -514,7 +520,7 @@ void MainWindow::openProgress() {
     QJsonObject data;
     QString error;
     if (!ProgressStore::load(path, &data, &error)) {
-        QMessageBox::critical(this, tr("Ошибка открытия"), error);
+        m_notification->showMessage(error, UiFeedbackLevel::Error);
         return;
     }
     if (!restoreProgress(data, path)) return;
@@ -531,7 +537,7 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
             tr("BazaVar M2MTools (*.m2m);;Все файлы (*)"));
         if (archivePath.isEmpty()) return false;
         if (!VariantArchive::load(archivePath, &variants, &error)) {
-            QMessageBox::critical(this, tr("Ошибка открытия"), error);
+            m_notification->showMessage(error, UiFeedbackLevel::Error);
             return false;
         }
     }
@@ -539,13 +545,11 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
     auto found = std::find_if(variants.cbegin(), variants.cend(),
         [variantNumber](const TrainingVariant& variant) { return variant.number == variantNumber; });
     if (found == variants.cend()) {
-        QMessageBox::critical(this, tr("Вариант не найден"),
-                              tr("В текущем BazaVar нет варианта №%1.").arg(variantNumber));
+        m_notification->showMessage(tr("В текущем BazaVar нет варианта №%1.").arg(variantNumber), UiFeedbackLevel::Error);
         return false;
     }
     if (!found->available()) {
-        QMessageBox::information(this, tr("В разработке"),
-            tr("Открытие работ Мили → Мура пока недоступно."));
+        m_notification->showMessage(tr("Открытие работ Мили → Мура пока недоступно."), UiFeedbackLevel::Warning);
         return false;
     }
     if (!loadArchive(archivePath) || !setupWorkspace(*found)) return false;
@@ -626,9 +630,7 @@ void MainWindow::createReport() {
     setFeedback(m_reportFeedback, tr("Отчёт создан: %1").arg(path), true);
 }
 
-void MainWindow::setFeedback(QLabel* label, const QString& text, bool success) {
-    label->setText((success ? QStringLiteral("✓ ") : QStringLiteral("⚠ ")) + text);
-    QFont font = label->font();
-    font.setBold(true);
-    label->setFont(font);
+void MainWindow::setFeedback(FeedbackLabel* label, const QString& text, bool success) {
+    label->showMessage(text, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
+    if (success) m_notification->showMessage(text, UiFeedbackLevel::Success);
 }

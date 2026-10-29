@@ -9,6 +9,7 @@ struct ReactionCheckResult {
 
 class ReactionChecker {
   public:
-    static ReactionCheckResult check(const TrainingVariant& task, const Automaton& candidate);
+    static ReactionCheckResult check(const TrainingVariant& task, const Automaton& candidate,
+                                     bool graph = false);
     static QStringList stateNames(int count);
 };

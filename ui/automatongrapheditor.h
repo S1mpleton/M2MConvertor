@@ -32,7 +32,7 @@ public:
     void setTemplate(const Automaton& automaton);
     void clearGraph();
     void createVertex();
-    void deleteSelectedVertex();
+    void deleteLastVertex();
 
     QVector<GraphVertexData> vertices() const;
     QVector<GraphEdgeData> edges() const;
@@ -60,7 +60,6 @@ private:
     void removeVertex(GraphVertexItem* vertex);
     void editVertex(GraphVertexItem* vertex);
     void editEdge(GraphEdgeItem* edge);
-    void updateInitialMarkers();
     void updatePalette();
     void updateSceneBounds();
     void clearItems();
@@ -70,8 +69,6 @@ private:
     QGraphicsScene* m_scene;
     QVector<GraphVertexItem*> m_vertices;
     QVector<GraphEdgeItem*> m_edges;
-    QStringList m_suggestedLabels;
-    QString m_initialStateName;
     AutomatonKind m_kind = AutomatonKind::Mealy;
     int m_nextVertexId = 1;
 };

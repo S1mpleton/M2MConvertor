@@ -1,4 +1,7 @@
 #include "ui/automatongrapheditor.h"
+#include "ui/inputsyntax.h"
+#include <QDialogButtonBox>
+#include <QPushButton>
 
 #include <QEvent>
 #include <QGraphicsItem>
@@ -56,7 +59,6 @@ public:
         m_label = value.trimmed();
         updateText();
     }
-    void setInitial(bool value) { m_initial = value; update(); }
     void setColors(const QColor& outline, const QColor& fill,
                    const QColor& text) {
         m_outline = outline;
@@ -82,8 +84,6 @@ protected:
         painter->setPen(pen);
         painter->setBrush(m_fill);
         painter->drawEllipse(rect());
-        if (m_initial)
-            painter->drawEllipse(rect().adjusted(5, 5, -5, -5));
     }
 
 private:
@@ -98,7 +98,6 @@ private:
     QString m_label;
     QGraphicsSimpleTextItem* m_text;
     QVector<GraphEdgeItem*> m_edges;
-    bool m_initial = false;
     QColor m_outline;
     QColor m_fill;
 };
@@ -281,27 +280,11 @@ AutomatonGraphEditor::AutomatonGraphEditor(QWidget* parent)
 }
 
 void AutomatonGraphEditor::setTemplate(const Automaton& automaton) {
-    m_suggestedLabels.clear();
     m_kind = automaton.kind;
-    m_initialStateName = automaton.states.value(automaton.initialState);
-    for (int state = 0; state < automaton.states.size(); ++state) {
-        QString label = automaton.states[state];
-        if (automaton.kind == AutomatonKind::Moore) {
-            QStringList outputs;
-            for (int output : automaton.mooreOutputs.value(state))
-                outputs.append(automaton.outputs.value(output));
-            label += QStringLiteral(" / ") +
-                     (outputs.isEmpty() ? QStringLiteral("-") : outputs.join(','));
-        }
-        m_suggestedLabels.append(label);
-    }
-    updateInitialMarkers();
 }
 
 void AutomatonGraphEditor::clearGraph() {
     clearItems();
-    m_suggestedLabels.clear();
-    m_initialStateName.clear();
 }
 
 void AutomatonGraphEditor::clearItems() {
@@ -313,11 +296,9 @@ void AutomatonGraphEditor::clearItems() {
 }
 
 QString AutomatonGraphEditor::nextVertexLabel() const {
-    QStringList used;
-    for (const GraphVertexItem* vertex : m_vertices) used.append(statePart(vertex->label()));
-    for (const QString& suggestion : m_suggestedLabels)
-        if (!used.contains(statePart(suggestion))) return suggestion;
-    return {};
+    if (m_vertices.size() >= 10) return {};
+    return QString("a%1").arg(m_vertices.size()) +
+        (m_kind == AutomatonKind::Moore ? QStringLiteral(" / -") : QString());
 }
 
 QPointF AutomatonGraphEditor::nextVertexPosition() const {
@@ -337,7 +318,6 @@ void AutomatonGraphEditor::createVertex() {
     m_scene->clearSelection();
     vertex->setSelected(true);
     updatePalette();
-    updateInitialMarkers();
     updateSceneBounds();
     centerOn(vertex);
     setFocus();
@@ -410,23 +390,43 @@ void AutomatonGraphEditor::removeVertex(GraphVertexItem* vertex) {
     emit graphChanged();
 }
 
-void AutomatonGraphEditor::deleteSelectedVertex() {
-    removeVertex(selectedVertex());
+void AutomatonGraphEditor::deleteLastVertex() {
+    if (!m_vertices.isEmpty()) removeVertex(m_vertices.last());
     setFocus();
 }
 
+namespace {
+QString editValidated(QWidget* parent, const QString& title, const QString& hint,
+                      const QString& initial, InputSyntax::Kind kind, bool* accepted) {
+    QInputDialog dialog(parent);
+    dialog.setWindowTitle(title); dialog.setLabelText(hint);
+    dialog.setInputMode(QInputDialog::TextInput);
+    dialog.setOkButtonText(QObject::tr("Принять"));
+    dialog.setCancelButtonText(QObject::tr("Отмена"));
+    dialog.setTextValue(InputSyntax::normalize(initial, kind));
+    auto* edit = dialog.findChild<QLineEdit*>();
+    auto* validator = new InputSyntax(kind, edit);
+    edit->setValidator(validator);
+    auto update = [&dialog, edit] {
+        if (auto* buttons = dialog.findChild<QDialogButtonBox*>())
+            buttons->button(QDialogButtonBox::Ok)->setEnabled(edit->hasAcceptableInput());
+    };
+    QObject::connect(edit, &QLineEdit::textChanged, &dialog, update);
+    dialog.show(); update();
+    *accepted = dialog.exec() == QDialog::Accepted;
+    return edit->text();
+}
+}
 void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
     if (m_kind == AutomatonKind::Mealy) return; // State names are fixed by the task.
     bool accepted = false;
     const auto state = statePart(vertex->label());
-    const QString value = QInputDialog::getText(
-        this, tr("Выходы состояния %1").arg(state),
-        tr("Выходы y0…y9 через запятую, либо «-»:"), QLineEdit::Normal,
-        vertex->label().section('/', 1).trimmed(), &accepted).trimmed();
+    const QString value = editValidated(this, tr("Выходы состояния %1").arg(state),
+        tr("Выходы y0…y9 через запятую, либо «-»:"),
+        vertex->label().section('/', 1).trimmed(), InputSyntax::Outputs, &accepted);
     if (accepted) {
         vertex->setLabel(state + QStringLiteral(" / ") + (value.isEmpty() ? QStringLiteral("-") : value));
-        updateInitialMarkers();
-        updateSceneBounds();
+            updateSceneBounds();
         emit graphChanged();
     }
 }
@@ -435,20 +435,15 @@ void AutomatonGraphEditor::editEdge(GraphEdgeItem* edge) {
     bool accepted = false;
     const QString hint = m_kind == AutomatonKind::Mealy
         ? tr("Вход / выходы; например x1 / y1 или x1 / -; x2 / y2")
-        : tr("Входы через «;», например x1; x2");
-    const QString value = QInputDialog::getText(
-        this, tr("Подпись дуги"), hint, QLineEdit::Normal,
-        edge->label(), &accepted).trimmed();
+        : tr("Входы через запятую, например x1, x2");
+    const QString value = editValidated(this, tr("Подпись дуги"), hint,
+        edge->label(), m_kind == AutomatonKind::Moore ? InputSyntax::MooreEdges : InputSyntax::MealyEdges,
+        &accepted);
     if (accepted) {
         edge->setLabel(value);
         updateSceneBounds();
         emit graphChanged();
     }
-}
-
-void AutomatonGraphEditor::updateInitialMarkers() {
-    for (GraphVertexItem* vertex : m_vertices)
-        vertex->setInitial(statePart(vertex->label()) == m_initialStateName);
 }
 
 void AutomatonGraphEditor::mousePressEvent(QMouseEvent* event) {
@@ -472,9 +467,10 @@ void AutomatonGraphEditor::mousePressEvent(QMouseEvent* event) {
 void AutomatonGraphEditor::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete) {
         if (GraphVertexItem* vertex = selectedVertex()) {
-            removeVertex(vertex);
+            deleteLastVertex();
         } else {
             const QList<QGraphicsItem*> selected = m_scene->selectedItems();
+            if (selected.isEmpty()) deleteLastVertex();
             for (QGraphicsItem* item : selected) {
                 if (auto* edge = dynamic_cast<GraphEdgeItem*>(item)) {
                     removeEdge(edge);
@@ -561,6 +557,7 @@ bool AutomatonGraphEditor::fromJson(const QJsonObject& object, QString* error) {
     const QJsonValue edgeValue = object.value(QStringLiteral("edges"));
     if (!vertexValue.isArray() || !edgeValue.isArray())
         return fail(tr("Повреждены данные графического редактора."));
+    if (vertexValue.toArray().size() > 10) return fail(tr("Допускается не более 10 вершин."));
     QHash<int, GraphVertexItem*> byId;
     for (const QJsonValue& value : vertexValue.toArray()) {
         if (!value.isObject())
@@ -591,7 +588,6 @@ bool AutomatonGraphEditor::fromJson(const QJsonObject& object, QString* error) {
                            item.value(QStringLiteral("controlY")).toDouble()));
     }
     updatePalette();
-    updateInitialMarkers();
     updateSceneBounds();
     emit graphChanged();
     return true;

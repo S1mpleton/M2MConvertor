@@ -9,15 +9,16 @@ QStringList ReactionChecker::stateNames(int count) {
     return names;
 }
 
-ReactionCheckResult ReactionChecker::check(const TrainingVariant& task,
-                                           const Automaton& candidate) {
+ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Automaton& candidate,
+                                           bool graph) {
     if (!task.available())
         return {false, QStringLiteral("Преобразование Мили → Мура находится в разработке.")};
     QString error;
     if (!candidate.validate(&error))
         return {false, error};
     const auto& counts = task.counts(candidate.kind);
-    if (candidate.states != stateNames(counts.states) || candidate.initialState != 0)
+    if (candidate.states != stateNames(graph ? candidate.states.size() : counts.states) ||
+        (graph && candidate.states.size() > 10) || candidate.initialState != 0)
         return {false, QStringLiteral("Нужны состояния a0…a%1; начальное состояние — a0.")
                            .arg(counts.states - 1)};
     if (candidate.inputs.size() != counts.inputs || candidate.outputs.size() != counts.outputs)
@@ -50,17 +51,19 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task,
     for (int i = 0; i < task.reaction.size(); ++i) {
         const auto& expected = task.reaction[i];
         const int input = candidate.inputs.indexOf(expected.input);
+        if (input < 0)
+            return {false,
+                    QStringLiteral("Такт %1: не задан вход %2.").arg(i + 1).arg(expected.input), i};
         const auto* edge = edges.value(key(state, input), nullptr);
-        if (!edge)
+        if (!edge && candidate.kind == AutomatonKind::Mealy)
             return {false,
                     QStringLiteral("Такт %1: из %2 не задан переход по %3.")
                         .arg(i + 1)
                         .arg(candidate.states[state], expected.input),
                     i};
-        // Moore output is observed after consuming the input, at the destination.
-        const auto& values = candidate.kind == AutomatonKind::Moore
-                                 ? candidate.mooreOutputs[edge->to]
-                                 : edge->outputs;
+        // Moore emits at the current state. The final transition is unobserved.
+        const auto& values =
+            candidate.kind == AutomatonKind::Moore ? candidate.mooreOutputs[state] : edge->outputs;
         QSet<QString> actual;
         for (int output : values)
             actual.insert(candidate.outputs[output]);
@@ -77,7 +80,15 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task,
                              observed.isEmpty() ? QStringLiteral("—") : observed.join(", ")),
                     i};
         }
-        state = edge->to;
+        if (i + 1 < task.reaction.size()) {
+            if (!edge)
+                return {false,
+                        QStringLiteral("Такт %1: из %2 нет перехода по %3 для продолжения реакции.")
+                            .arg(i + 1)
+                            .arg(candidate.states[state], expected.input),
+                        i};
+            state = edge->to;
+        }
     }
     return {true, QStringLiteral("Верно. Реакция из a0 совпадает с вариантом во всех %1 тактах.")
                       .arg(task.reaction.size())};

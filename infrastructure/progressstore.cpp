@@ -8,7 +8,7 @@ bool ProgressStore::save(const QString& path, const QJsonObject& data,
                          QString* error) {
     QJsonObject root;
     root.insert(QStringLiteral("format"), QStringLiteral("M2MConvertorProgress"));
-    root.insert(QStringLiteral("version"), 2);
+    root.insert(QStringLiteral("version"), 3);
     root.insert(QStringLiteral("data"), data);
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
@@ -40,7 +40,8 @@ bool ProgressStore::load(const QString& path, QJsonObject* data,
     const QJsonObject root = document.object();
     if (root.value(QStringLiteral("format")).toString() !=
             QStringLiteral("M2MConvertorProgress") ||
-        root.value(QStringLiteral("version")).toInt() != 2 ||
+        (root.value(QStringLiteral("version")).toInt() != 2 &&
+         root.value(QStringLiteral("version")).toInt() != 3) ||
         !root.value(QStringLiteral("data")).isObject()) {
         if (error) *error = QStringLiteral("Версия файла прогресса не поддерживается. Работы старого формата с полными автоматами нужно начать заново.");
         return false;

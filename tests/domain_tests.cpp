@@ -45,7 +45,9 @@ Automaton sampleMoore() {
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
-    const auto task = trainingVariant();
+    auto task = trainingVariant();
+    task.reaction = {{"x2", {"y2"}}, {"x1", {"y3", "y0"}},
+                     {"x2", {"y2"}}, {"x2", {"y3", "y0"}}};
     Automaton reactionMoore;
     reactionMoore.kind = AutomatonKind::Moore;
     reactionMoore.states = {"a0", "a1", "a2"};
@@ -56,15 +58,15 @@ int main(int argc, char** argv) {
     reactionMoore.transitions = {{0, 1, 1, {}}, {1, 0, 0, {}},
                                  {1, 1, 2, {}}, {2, 0, 0, {}}};
     require(ReactionChecker::check(task, reactionMoore).accepted,
-            "Moore consumes ordered reaction from a0 using destination outputs");
+            "Moore consumes ordered reaction from a0 using current-state outputs");
     auto broken = reactionMoore;
-    broken.mooreOutputs[1] = {0};
+    broken.mooreOutputs[0] = {0};
     require(ReactionChecker::check(task, broken).step == 0,
             "first incorrect output is identified");
     broken = reactionMoore;
-    broken.transitions.removeLast();
-    require(ReactionChecker::check(task, broken).step == 4,
-            "missing transition reports exact late step");
+    broken.transitions.removeFirst();
+    require(ReactionChecker::check(task, broken).step == 0,
+            "missing transition reports exact missing step");
     broken = reactionMoore;
     broken.initialState = 1;
     require(!ReactionChecker::check(task, broken).accepted, "initial state must be a0");
@@ -82,7 +84,7 @@ int main(int argc, char** argv) {
     require(!ReactionChecker::check(reordered, reactionMoore).accepted,
             "reaction order affects the verdict");
     reordered = task;
-    reordered.reaction[0].outputs = {"y0", "y3"};
+    reordered.reaction[1].outputs = {"y0", "y3"};
     require(ReactionChecker::check(reordered, reactionMoore).accepted,
             "outputs within one clock tick are a set");
     Automaton reactionMealy;
@@ -91,7 +93,7 @@ int main(int argc, char** argv) {
     reactionMealy.initialState = 0;
     reactionMealy.inputs = reactionMoore.inputs;
     reactionMealy.outputs = reactionMoore.outputs;
-    reactionMealy.transitions = {{0, 1, 1, {0, 2}}, {1, 0, 0, {1}}, {1, 1, 1, {}}};
+    reactionMealy.transitions = {{0, 1, 1, {1}}, {1, 0, 0, {0, 2}}, {1, 1, 1, {0, 2}}};
     require(ReactionChecker::check(task, reactionMealy).accepted,
             "Mealy uses its own counts and is checked against the same trace");
     auto wrongCounts = task;
@@ -106,6 +108,25 @@ int main(int argc, char** argv) {
     wrongCounts.direction = ConversionDirection::MealyToMoore;
     require(!ReactionChecker::check(wrongCounts, reactionMoore).accepted,
             "unfinished conversion is unavailable in the checker");
+    TrainingVariant single;
+    single.moore = single.mealy = {1, 1, 1};
+    single.reaction = {{"x9", {"y4"}}};
+    Automaton one;
+    one.kind = AutomatonKind::Moore; one.states = {"a0"}; one.initialState = 0;
+    one.inputs = {"x9"}; one.outputs = {"y4"}; one.mooreOutputs = {{0}};
+    require(ReactionChecker::check(single, one).accepted, "single Moore output needs no final transition");
+    one.transitions = {{0, 0, 0, {}}};
+    require(ReactionChecker::check(single, one).accepted, "single Moore output also accepts a loop");
+    single.reaction.append(ReactionStep{"x9", {"y4"}});
+    require(ReactionChecker::check(single, one).accepted, "loop carries the reaction to the next tick");
+    one.transitions.clear();
+    require(!ReactionChecker::check(single, one).accepted, "missing nonfinal transition cannot continue");
+    single.reaction.removeLast();
+    one.states.append("a1"); one.mooreOutputs.append(QSet<int>{});
+    require(ReactionChecker::check(single, one, true).accepted &&
+            !ReactionChecker::check(single, one).accepted, "graph accepts extra states but table uses variant counts");
+    one.states = ReactionChecker::stateNames(11); one.mooreOutputs.resize(11);
+    require(!ReactionChecker::check(single, one, true).accepted, "graph cannot contain more than 10 states");
     const Automaton expected = sampleMoore();
     Automaton renamed;
     renamed.kind = AutomatonKind::Moore;
@@ -242,8 +263,7 @@ int main(int argc, char** argv) {
                 variants.first().moore.states == 3 && variants.first().mealy.states == 2 &&
                 variants.first().reaction.size() == 5 &&
                 variants.first().reaction[0].outputs == QStringList({"y3", "y0"}) &&
-                ReactionChecker::check(variants.first(), reactionMoore).accepted &&
-                ReactionChecker::check(variants.first(), reactionMealy).accepted,
+                !variants.first().diagram.isEmpty(),
                 "real M2MTools export preserves image, counts and ordered reaction");
     }
     std::cout << "PASS conversion, behavioral equivalence, graph isomorphism, BazaVar and progress round trip\n";

@@ -9,7 +9,7 @@
 
 class AutomatonGraphEditor;
 class QLabel;
-class QLineEdit;
+class FeedbackLabel;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
@@ -39,6 +39,7 @@ private:
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
     void configureTable();
+    int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, QString* error) const;
     void configureMatrix();
     bool readMatrix(Automaton* result, QString* error) const;
@@ -49,16 +50,14 @@ private:
     void invalidateFromTable();
     void invalidateFromMatrix();
     void invalidateGraph();
-    void showFeedback(QLabel* label, const QString& message, bool success);
-    CandidateCheck checkCandidate(const Automaton& candidate) const;
-    QStringList parsedNames(const QString& text) const;
+    void showFeedback(FeedbackLabel* label, const QString& message, bool success);
+    CandidateCheck checkCandidate(const Automaton& candidate, bool graph = false) const;
     QSet<int> parseOutputs(const QString& text, Automaton& automaton,
                            bool* ok) const;
     QJsonArray tableToJson(const QTableWidget* table) const;
     void tableFromJson(QTableWidget* table, const QJsonArray& array);
 
     TrainingVariant m_task;
-    QStringList m_tableInputs;
     AutomatonKind m_editorKind = AutomatonKind::Mealy;
     Automaton m_tableAutomaton;
     Automaton m_matrixAutomaton;
@@ -68,23 +67,21 @@ private:
     bool m_graphAccepted = false;
     bool m_loading = false;
 
+    FeedbackLabel* m_notification;
     QTabWidget* m_tabs;
-    QLineEdit* m_statesEdit;
-    QLineEdit* m_inputsEdit;
     QLabel* m_assignmentImage;
-    QLabel* m_typeLabel;
-    QLabel* m_criterionLabel;
     QTableWidget* m_transitionTable;
-    QLabel* m_tableFeedback;
+    FeedbackLabel* m_tableFeedback;
 
     QLabel* m_matrixDimension;
+    QLabel* m_outputCaption;
     QTableWidget* m_matrixOutputs;
     QTableWidget* m_matrixTable;
     QTableWidget* m_matrixReference;
-    QLabel* m_matrixFeedback;
+    FeedbackLabel* m_matrixFeedback;
 
     AutomatonGraphEditor* m_graphEditor;
-    QLabel* m_graphFeedback;
+    FeedbackLabel* m_graphFeedback;
 };
 
 #endif
