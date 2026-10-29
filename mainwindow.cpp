@@ -1,10 +1,10 @@
 #include "mainwindow.h"
 
-#include "domain/conversionservice.h"
 #include "infrastructure/progressstore.h"
 #include "ui/automatoneditor.h"
 
 #include <QAction>
+#include <QBuffer>
 #include <QComboBox>
 #include <QDateTime>
 #include <QFileDialog>
@@ -26,6 +26,7 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QStandardItemModel>
 #include <QStyle>
 #include <QTabWidget>
 #include <QTextStream>
@@ -69,7 +70,7 @@ QWidget* MainWindow::createLandingPage() {
     title->setFont(titleFont);
     title->setAlignment(Qt::AlignCenter);
     auto* explanation = new QLabel(tr(
-        "Откройте зашифрованную базу BazaVar, созданную в M2MTools, и выберите вариант. "
+        "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
         "Направление преобразования определяется самим вариантом."));
     explanation->setWordWrap(true);
     explanation->setAlignment(Qt::AlignCenter);
@@ -87,7 +88,7 @@ QWidget* MainWindow::createLandingPage() {
     archiveLayout->setContentsMargins(20, 24, 20, 20);
     archiveLayout->setSpacing(14);
     auto* archiveHint = new QLabel(tr(
-        "Выберите защищённый файл BazaVar, экспортированный из M2MTools. "
+        "Выберите файл .m2m с реакциями, экспортированный из M2MTools. "
         "Приложение проверит целостность архива перед показом вариантов."));
     archiveHint->setWordWrap(true);
     archiveLayout->addWidget(archiveHint);
@@ -115,8 +116,10 @@ QWidget* MainWindow::createLandingPage() {
     auto* form = new QFormLayout;
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_variantCombo = new QComboBox;
+    m_variantCombo->setObjectName("variantCombo");
     m_variantCombo->setEnabled(false);
     m_landingDirection = new QLabel(tr("—"));
+    m_landingDirection->setWordWrap(true);
     form->addRow(tr("Вариант:"), m_variantCombo);
     form->addRow(tr("Преобразование:"), m_landingDirection);
     variantLayout->addLayout(form);
@@ -172,9 +175,11 @@ QWidget* MainWindow::createWorkspacePage() {
     m_workflowTabs->setObjectName(QStringLiteral("workflowTabs"));
     m_workflowTabs->addTab(createStartPage(), tr("Начало работы"));
     m_sourceEditor = new AutomatonEditor;
+    m_sourceEditor->setObjectName("sourceEditor");
     m_targetEditor = new AutomatonEditor;
-    m_workflowTabs->addTab(m_sourceEditor, tr("Исходный автомат"));
-    m_workflowTabs->addTab(m_targetEditor, tr("Эквивалентный автомат"));
+    m_targetEditor->setObjectName("targetEditor");
+    m_workflowTabs->addTab(m_sourceEditor, tr("Автомат Мура"));
+    m_workflowTabs->addTab(m_targetEditor, tr("Автомат Мили"));
     m_workflowTabs->addTab(createReportPage(), tr("Отчёт"));
     m_workflowTabs->setTabEnabled(1, false);
     m_workflowTabs->setTabEnabled(2, false);
@@ -232,8 +237,9 @@ QWidget* MainWindow::createStartPage() {
     m_stateCount = new QSpinBox;
     m_inputCount = new QSpinBox;
     m_outputCount = new QSpinBox;
-    for (QSpinBox* spin : {m_stateCount, m_inputCount, m_outputCount})
-        spin->setRange(1, 200);
+    m_stateCount->setRange(1, 999999);
+    m_inputCount->setRange(1, 10);
+    m_outputCount->setRange(1, 10);
     countLayout->addRow(tr("Количество состояний:"), m_stateCount);
     countLayout->addRow(tr("Количество входных сигналов:"), m_inputCount);
     countLayout->addRow(tr("Количество выходных сигналов:"), m_outputCount);
@@ -344,39 +350,49 @@ bool MainWindow::loadArchive(const QString& path, bool showErrors) {
     m_archivePathLabel->setToolTip(m_archivePath);
     m_variantCombo->blockSignals(true);
     m_variantCombo->clear();
-    for (const TrainingVariant& variant : variants)
-        m_variantCombo->addItem(tr("Вариант №%1").arg(variant.number), variant.number);
+    int firstAvailable = -1;
+    for (const TrainingVariant& variant : variants) {
+        const int row = m_variantCombo->count();
+        m_variantCombo->addItem(variant.available() ? tr("Вариант №%1").arg(variant.number)
+            : tr("Вариант №%1 — Мили → Мура (в разработке)").arg(variant.number), variant.number);
+        if (!variant.available()) {
+            if (auto* model = qobject_cast<QStandardItemModel*>(m_variantCombo->model()))
+                model->item(row)->setEnabled(false);
+        } else if (firstAvailable < 0) firstAvailable = row;
+    }
+    m_variantCombo->setCurrentIndex(firstAvailable);
     m_variantCombo->setEnabled(true);
     m_variantCombo->blockSignals(false);
-    updateVariantSelection(0);
+    updateVariantSelection(m_variantCombo->currentIndex());
     return true;
 }
 
 void MainWindow::updateVariantSelection(int index) {
     const bool valid = index >= 0 && index < m_variants.size();
-    m_beginButton->setEnabled(valid);
+    m_beginButton->setEnabled(valid && m_variants[index].available());
     m_landingDirection->setText(valid
-        ? conversionDirectionName(m_variants[index].direction) : QStringLiteral("—"));
+        ? (m_variants[index].available() ? conversionDirectionName(m_variants[index].direction)
+                                        : tr("Мили → Мура — в разработке"))
+        : (m_variants.isEmpty() ? QStringLiteral("—")
+                               : tr("В базе нет доступных вариантов Мура → Мили.")));
 }
 
 void MainWindow::beginWork() {
     const int index = m_variantCombo->currentIndex();
     if (index < 0 || index >= m_variants.size()) return;
-    setupWorkspace(m_variants[index]);
+    if (!setupWorkspace(m_variants[index])) return;
     m_progressPath.clear();
     m_pages->setCurrentIndex(kWorkspacePage);
 }
 
-void MainWindow::setupWorkspace(const TrainingVariant& variant) {
+bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
+    if (!variant.available()) {
+        m_landingDirection->setText(tr("Мили → Мура — в разработке. Выберите вариант Мура → Мили."));
+        return false;
+    }
     m_currentVariant = variant;
     m_hasVariant = true;
     m_countsAccepted = false;
-    QString error;
-    if (!ConversionService::convert(variant.source, &m_expectedTarget, &error)) {
-        QMessageBox::critical(this, tr("Ошибка варианта"), error);
-        m_hasVariant = false;
-        return;
-    }
     m_variantTitle->setText(tr("Вариант №%1 — %2")
         .arg(variant.number).arg(conversionDirectionName(variant.direction)));
     m_directionLabel->setText(conversionDirectionName(variant.direction));
@@ -391,8 +407,11 @@ void MainWindow::setupWorkspace(const TrainingVariant& variant) {
         m_diagramLabel->setText(tr("Изображение задания отсутствует"));
     }
     m_startFeedback->clear();
-    m_sourceEditor->setExpected(variant.source);
-    m_targetEditor->setEquivalentTo(variant.source, m_expectedTarget.kind);
+    m_stateCount->setValue(1);
+    m_inputCount->setValue(1);
+    m_outputCount->setValue(1);
+    m_sourceEditor->setTask(variant, AutomatonKind::Moore);
+    m_targetEditor->setTask(variant, AutomatonKind::Mealy);
     m_workflowTabs->setCurrentIndex(0);
     m_teacherName->clear(); m_teacherId->clear();
     m_studentName->clear(); m_studentId->clear();
@@ -401,14 +420,15 @@ void MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_saveAction->setEnabled(true);
     m_saveAsAction->setEnabled(true);
     updateWorkflowState();
+    return true;
 }
 
 void MainWindow::acceptCounts() {
     if (!m_hasVariant) return;
-    const Automaton& source = m_currentVariant.source;
-    const bool correct = m_stateCount->value() == source.states.size() &&
-                         m_inputCount->value() == source.inputs.size() &&
-                         m_outputCount->value() == source.outputs.size();
+    const auto& source = m_currentVariant.moore;
+    const bool correct = m_stateCount->value() == source.states &&
+                         m_inputCount->value() == source.inputs &&
+                         m_outputCount->value() == source.outputs;
     if (!correct) {
         m_countsAccepted = false;
         setFeedback(m_startFeedback,
@@ -503,29 +523,39 @@ void MainWindow::openProgress() {
 
 bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progressPath) {
     QString archivePath = data.value(QStringLiteral("archivePath")).toString();
-    if (!loadArchive(archivePath, false)) {
+    QList<TrainingVariant> variants;
+    QString error;
+    if (!VariantArchive::load(archivePath, &variants, &error)) {
         archivePath = QFileDialog::getOpenFileName(
             this, tr("Укажите BazaVar для сохранённой работы"), QString(),
             tr("BazaVar M2MTools (*.m2m);;Все файлы (*)"));
-        if (archivePath.isEmpty() || !loadArchive(archivePath)) return false;
+        if (archivePath.isEmpty()) return false;
+        if (!VariantArchive::load(archivePath, &variants, &error)) {
+            QMessageBox::critical(this, tr("Ошибка открытия"), error);
+            return false;
+        }
     }
     const int variantNumber = data.value(QStringLiteral("variantNumber")).toInt();
-    auto found = std::find_if(m_variants.cbegin(), m_variants.cend(),
+    auto found = std::find_if(variants.cbegin(), variants.cend(),
         [variantNumber](const TrainingVariant& variant) { return variant.number == variantNumber; });
-    if (found == m_variants.cend()) {
+    if (found == variants.cend()) {
         QMessageBox::critical(this, tr("Вариант не найден"),
                               tr("В текущем BazaVar нет варианта №%1.").arg(variantNumber));
         return false;
     }
-    setupWorkspace(*found);
-    if (!m_hasVariant) return false;
+    if (!found->available()) {
+        QMessageBox::information(this, tr("В разработке"),
+            tr("Открытие работ Мили → Мура пока недоступно."));
+        return false;
+    }
+    if (!loadArchive(archivePath) || !setupWorkspace(*found)) return false;
     m_stateCount->setValue(data.value(QStringLiteral("stateCount")).toInt(1));
     m_inputCount->setValue(data.value(QStringLiteral("inputCount")).toInt(1));
     m_outputCount->setValue(data.value(QStringLiteral("outputCount")).toInt(1));
     m_countsAccepted = data.value(QStringLiteral("countsAccepted")).toBool() &&
-        m_stateCount->value() == m_currentVariant.source.states.size() &&
-        m_inputCount->value() == m_currentVariant.source.inputs.size() &&
-        m_outputCount->value() == m_currentVariant.source.outputs.size();
+        m_stateCount->value() == m_currentVariant.moore.states &&
+        m_inputCount->value() == m_currentVariant.moore.inputs &&
+        m_outputCount->value() == m_currentVariant.moore.outputs;
     m_sourceEditor->fromJson(data.value(QStringLiteral("source")).toObject());
     m_targetEditor->fromJson(data.value(QStringLiteral("target")).toObject());
     const QJsonObject report = data.value(QStringLiteral("report")).toObject();
@@ -557,13 +587,16 @@ void MainWindow::createReport() {
         tr("Отчёт HTML (*.html)"));
     if (path.isEmpty()) return;
     if (!path.endsWith(QStringLiteral(".html"), Qt::CaseInsensitive)) path += QStringLiteral(".html");
-    const QString image = QString::fromLatin1(m_currentVariant.diagram.toBase64());
-    const QString mime = m_currentVariant.diagramFileName.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive)
-        ? QStringLiteral("image/png") : QStringLiteral("image/jpeg");
+    QByteArray pngData;
+    QBuffer imageBuffer(&pngData);
+    imageBuffer.open(QIODevice::WriteOnly);
+    QImage::fromData(m_currentVariant.diagram).save(&imageBuffer, "PNG");
+    const QString image = QString::fromLatin1(pngData.toBase64());
+    const QString mime = QStringLiteral("image/png");
     const QString html = QStringLiteral(
         "<!doctype html><html lang='ru'><meta charset='utf-8'><title>Отчёт M2MConvertor</title>"
         "<style>body{font:16px sans-serif;max-width:900px;margin:40px auto;color:#172033}"
-        "table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:7px}img{max-width:100%%}</style>"
+        "table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:7px}img{max-width:100%}</style>"
         "<h1>Преобразование эквивалентных автоматов</h1>"
         "<p><b>Вариант:</b> №%1<br><b>Направление:</b> %2<br><b>Дата:</b> %3</p>"
         "<h2>Участники</h2><table><tr><th>Роль</th><th>Ф. И. О.</th><th>Идентификатор</th></tr>"
@@ -572,8 +605,9 @@ void MainWindow::createReport() {
         "<p><b>Группа:</b> %8<br><b>Зачётная книжка:</b> %9</p>"
         "<h2>Результат</h2><p>%10</p><p>%11</p>"
         "<p><b>Проверка:</b> таблица, матрица и граф обоих автоматов приняты; "
-        "результат преобразования поведенчески эквивалентен исходному автомату "
-        "для всех входных последовательностей.</p>"
+        "реакция каждого введённого автомата из a0 совпадает с реакцией варианта. "
+        "Проверена заданная последовательность входов; эквивалентность на всех "
+        "возможных последовательностях этой проверкой не устанавливается.</p>"
         "<h2>Задание</h2><img src='data:%12;base64,%13'></html>")
         .arg(m_currentVariant.number)
         .arg(conversionDirectionName(m_currentVariant.direction).toHtmlEscaped())
@@ -581,8 +615,8 @@ void MainWindow::createReport() {
         .arg(m_teacherName->text().toHtmlEscaped(), m_teacherId->text().toHtmlEscaped(),
              m_studentName->text().toHtmlEscaped(), m_studentId->text().toHtmlEscaped(),
              m_group->text().toHtmlEscaped(), m_recordBook->text().toHtmlEscaped(),
-             automatonSummary(m_currentVariant.source).toHtmlEscaped(),
-             automatonSummary(m_expectedTarget).toHtmlEscaped(), mime, image);
+             automatonSummary(m_sourceEditor->acceptedAutomaton()).toHtmlEscaped(),
+             automatonSummary(m_targetEditor->acceptedAutomaton()).toHtmlEscaped(), mime, image);
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) ||
         file.write(html.toUtf8()) != html.toUtf8().size() || !file.commit()) {

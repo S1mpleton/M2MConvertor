@@ -314,17 +314,10 @@ void AutomatonGraphEditor::clearItems() {
 
 QString AutomatonGraphEditor::nextVertexLabel() const {
     QStringList used;
-    for (const GraphVertexItem* vertex : m_vertices) used.append(vertex->label());
+    for (const GraphVertexItem* vertex : m_vertices) used.append(statePart(vertex->label()));
     for (const QString& suggestion : m_suggestedLabels)
-        if (!used.contains(suggestion)) return suggestion;
-    int number = 1;
-    for (;;) {
-        const QString candidate = m_kind == AutomatonKind::Moore
-            ? QStringLiteral("q%1 / -").arg(number)
-            : QStringLiteral("q%1").arg(number);
-        if (!used.contains(candidate)) return candidate;
-        ++number;
-    }
+        if (!used.contains(statePart(suggestion))) return suggestion;
+    return {};
 }
 
 QPointF AutomatonGraphEditor::nextVertexPosition() const {
@@ -335,7 +328,9 @@ QPointF AutomatonGraphEditor::nextVertexPosition() const {
 }
 
 void AutomatonGraphEditor::createVertex() {
-    auto* vertex = new GraphVertexItem(this, m_nextVertexId++, nextVertexLabel());
+    const auto label = nextVertexLabel();
+    if (label.isEmpty()) return;
+    auto* vertex = new GraphVertexItem(this, m_nextVertexId++, label);
     vertex->setPos(nextVertexPosition());
     m_scene->addItem(vertex);
     m_vertices.append(vertex);
@@ -421,15 +416,15 @@ void AutomatonGraphEditor::deleteSelectedVertex() {
 }
 
 void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
+    if (m_kind == AutomatonKind::Mealy) return; // State names are fixed by the task.
     bool accepted = false;
-    const QString hint = m_kind == AutomatonKind::Mealy
-        ? tr("Имя состояния, например q1")
-        : tr("Состояние / выходы, например q1 / y1,y2");
+    const auto state = statePart(vertex->label());
     const QString value = QInputDialog::getText(
-        this, tr("Подпись вершины"), hint, QLineEdit::Normal,
-        vertex->label(), &accepted).trimmed();
-    if (accepted && !value.isEmpty()) {
-        vertex->setLabel(value);
+        this, tr("Выходы состояния %1").arg(state),
+        tr("Выходы y0…y9 через запятую, либо «-»:"), QLineEdit::Normal,
+        vertex->label().section('/', 1).trimmed(), &accepted).trimmed();
+    if (accepted) {
+        vertex->setLabel(state + QStringLiteral(" / ") + (value.isEmpty() ? QStringLiteral("-") : value));
         updateInitialMarkers();
         updateSceneBounds();
         emit graphChanged();

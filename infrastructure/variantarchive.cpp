@@ -5,6 +5,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
+#include <QRegularExpression>
+#include <QImage>
 
 #include <openssl/evp.h>
 
@@ -12,7 +14,7 @@
 #include <algorithm>
 
 namespace {
-const QByteArray kMagic("M2MTOOLS2");
+const QByteArray kMagic("M2MLITE1");
 constexpr int kSaltSize = 16;
 constexpr int kNonceSize = 12;
 constexpr int kTagSize = 16;
@@ -99,65 +101,62 @@ bool parseVariant(const QJsonObject& object, TrainingVariant* variant,
         return fail(QStringLiteral("Архив содержит неверный номер или тип варианта."));
     parsed.direction = type == QStringLiteral("MealyToMoore")
         ? ConversionDirection::MealyToMoore : ConversionDirection::MooreToMealy;
-    parsed.source.kind = parsed.direction == ConversionDirection::MealyToMoore
-        ? AutomatonKind::Mealy : AutomatonKind::Moore;
-    if (!stringList(object.value(QStringLiteral("states")), &parsed.source.states) ||
-        !stringList(object.value(QStringLiteral("inputs")), &parsed.source.inputs) ||
-        !stringList(object.value(QStringLiteral("outputs")), &parsed.source.outputs))
-        return fail(QStringLiteral("Архив содержит повреждённые списки имён."));
-    parsed.source.initialState = parsed.source.states.indexOf(
-        object.value(QStringLiteral("initialState")).toString());
-
-    const QJsonValue transitionValue = object.value(QStringLiteral("transitions"));
-    if (!transitionValue.isArray() ||
-        transitionValue.toArray().size() != parsed.source.inputs.size())
-        return fail(QStringLiteral("Архив содержит повреждённую таблицу переходов."));
-    const QJsonArray rows = transitionValue.toArray();
-    for (int input = 0; input < rows.size(); ++input) {
-        if (!rows[input].isArray() || rows[input].toArray().size() != parsed.source.states.size())
-            return fail(QStringLiteral("Размер таблицы переходов не совпадает со списками имён."));
-        const QJsonArray cells = rows[input].toArray();
-        for (int from = 0; from < cells.size(); ++from) {
-            if (!cells[from].isObject()) return fail(QStringLiteral("Повреждена ячейка перехода."));
-            const QJsonObject cell = cells[from].toObject();
-            const QString nextName = cell.value(QStringLiteral("nextState")).toString();
-            if (nextName.isEmpty()) continue;
-            const int to = parsed.source.states.indexOf(nextName);
-            if (to < 0) return fail(QStringLiteral("Переход ссылается на неизвестное состояние."));
-            Transition transition{from, input, to, {}};
-            QStringList outputNames;
-            if (!stringList(cell.value(QStringLiteral("outputs")), &outputNames))
-                return fail(QStringLiteral("Повреждены выходы перехода."));
-            for (const QString& name : outputNames) {
-                const int output = parsed.source.outputs.indexOf(name);
-                if (output < 0) return fail(QStringLiteral("Переход ссылается на неизвестный выход."));
-                transition.outputs.insert(output);
-            }
-            if (parsed.source.kind == AutomatonKind::Moore) transition.outputs.clear();
-            parsed.source.transitions.append(transition);
+    auto readCounts = [](const QJsonValue& value, AutomatonCounts* counts) {
+        if (!value.isObject()) return false;
+        const auto obj = value.toObject();
+        counts->states = obj.value("states").toInt(-1);
+        counts->inputs = obj.value("inputs").toInt(-1);
+        counts->outputs = obj.value("outputs").toInt(-1);
+        return counts->states >= 1 && counts->states <= 999999 &&
+               counts->inputs >= 1 && counts->inputs <= 10 &&
+               counts->outputs >= 1 && counts->outputs <= 10;
+    };
+    if (parsed.number > 999999 || !readCounts(object.value("mealy"), &parsed.mealy) ||
+        !readCounts(object.value("moore"), &parsed.moore))
+        return fail(QStringLiteral("В варианте повреждены количества состояний или сигналов."));
+    if (!object.value("reaction").isArray() || object.value("reaction").toArray().isEmpty())
+        return fail(QStringLiteral("В варианте отсутствует реакция автомата."));
+    const QRegularExpression inputPattern(QStringLiteral("^x[0-9]$"));
+    const QRegularExpression outputPattern(QStringLiteral("^y[0-9]$"));
+    QSet<QString> inputs, outputs;
+    for (const auto& value : object.value("reaction").toArray()) {
+        const auto step = value.toObject();
+        ReactionStep reaction;
+        reaction.input = step.value("input").toString();
+        if (!inputPattern.match(reaction.input).hasMatch() ||
+            !stringList(step.value("outputs"), &reaction.outputs))
+            return fail(QStringLiteral("Повреждён такт реакции автомата."));
+        QSet<QString> seen;
+        for (const auto& output : reaction.outputs) {
+            if (!outputPattern.match(output).hasMatch() || seen.contains(output))
+                return fail(QStringLiteral("Неверные или повторяющиеся выходы в такте реакции."));
+            seen.insert(output);
+            outputs.insert(output);
         }
+        inputs.insert(reaction.input);
+        parsed.reaction.append(reaction);
     }
-    if (parsed.source.kind == AutomatonKind::Moore) {
-        parsed.source.mooreOutputs.resize(parsed.source.states.size());
-        const QJsonObject values = object.value(QStringLiteral("mooreOutputs")).toObject();
-        for (int state = 0; state < parsed.source.states.size(); ++state) {
-            QStringList names;
-            if (!stringList(values.value(parsed.source.states[state]), &names))
-                return fail(QStringLiteral("Повреждены выходы состояния автомата Мура."));
-            for (const QString& name : names) {
-                const int output = parsed.source.outputs.indexOf(name);
-                if (output < 0) return fail(QStringLiteral("Состояние ссылается на неизвестный выход."));
-                parsed.source.mooreOutputs[state].insert(output);
-            }
-        }
+    const auto& source = parsed.direction == ConversionDirection::MooreToMealy
+                             ? parsed.moore : parsed.mealy;
+    if (inputs.size() != source.inputs || outputs.size() != source.outputs)
+        return fail(QStringLiteral("В варианте №%1 количества сигналов исходного автомата "
+                                   "не совпадают с реакцией. Исправьте вариант в M2MTools.")
+                        .arg(parsed.number));
+    if (object.contains("image")) {
+        const auto image = object.value("image").toObject();
+        const auto encoded = image.value("data").toString();
+        if (encoded.size() > ((10 * 1024 * 1024 + 2) / 3) * 4)
+            return fail(QStringLiteral("Изображение задания превышает 10 МБ."));
+        const auto decoded = QByteArray::fromBase64Encoding(
+            encoded.toLatin1(), QByteArray::AbortOnBase64DecodingErrors);
+        if (!decoded || decoded.decoded.isEmpty() ||
+            decoded.decoded.size() > 10 * 1024 * 1024 ||
+            QImage::fromData(decoded.decoded).isNull() ||
+            image.value("fileName").toString().trimmed().isEmpty())
+            return fail(QStringLiteral("Изображение задания повреждено."));
+        parsed.diagram = decoded.decoded;
+        parsed.diagramFileName = image.value("fileName").toString();
     }
-    parsed.diagramFileName = object.value(QStringLiteral("imageName")).toString();
-    parsed.diagram = QByteArray::fromBase64(
-        object.value(QStringLiteral("imageData")).toString().toLatin1());
-    QString validationError;
-    if (!parsed.source.validate(&validationError))
-        return fail(QStringLiteral("Вариант №%1 некорректен: %2")
-                        .arg(parsed.number).arg(validationError));
     *variant = parsed;
     return true;
 }
@@ -179,7 +178,7 @@ bool VariantArchive::load(const QString& path, QList<TrainingVariant>* variants,
     const QByteArray archive = file.readAll();
     const int prefixSize = kMagic.size() + kSaltSize + kNonceSize + kTagSize;
     if (archive.size() <= prefixSize || !archive.startsWith(kMagic)) {
-        if (error) *error = QStringLiteral("Выбранный файл не является архивом M2MTools.");
+        if (error) *error = QStringLiteral("Нужен новый архив .m2m с реакциями из M2MTools (ветка Lite). Старые базы с автоматами не поддерживаются.");
         return false;
     }
     int offset = kMagic.size();
@@ -199,7 +198,7 @@ bool VariantArchive::load(const QString& path, QList<TrainingVariant>* variants,
         return false;
     }
     const QJsonObject root = document.object();
-    if (root.value(QStringLiteral("format")).toString() != QStringLiteral("M2MTools") ||
+    if (root.value(QStringLiteral("format")).toString() != QStringLiteral("M2MToolsLite") ||
         root.value(QStringLiteral("version")).toInt() != 1 ||
         !root.value(QStringLiteral("variants")).isArray()) {
         if (error) *error = QStringLiteral("Версия BazaVar не поддерживается.");
@@ -208,7 +207,10 @@ bool VariantArchive::load(const QString& path, QList<TrainingVariant>* variants,
     QList<TrainingVariant> loaded;
     QSet<int> numbers;
     for (const QJsonValue& value : root.value(QStringLiteral("variants")).toArray()) {
-        if (!value.isObject()) return false;
+        if (!value.isObject()) {
+            if (error) *error = QStringLiteral("Архив содержит повреждённый вариант.");
+            return false;
+        }
         TrainingVariant variant;
         if (!parseVariant(value.toObject(), &variant, error)) return false;
         if (numbers.contains(variant.number)) {

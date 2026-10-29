@@ -22,6 +22,7 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
 
 private:
+    friend struct MainWindowTestAccess;
     QWidget* createLandingPage();
     QWidget* createWorkspacePage();
     QWidget* createStartPage();
@@ -31,7 +32,7 @@ private:
     bool loadArchive(const QString& path, bool showErrors = true);
     void updateVariantSelection(int index);
     void beginWork();
-    void setupWorkspace(const TrainingVariant& variant);
+    bool setupWorkspace(const TrainingVariant& variant);
     void acceptCounts();
     void returnToLanding();
     void saveProgress(bool saveAs = false);
@@ -71,7 +72,6 @@ private:
     QAction* m_saveAsAction;
     QList<TrainingVariant> m_variants;
     TrainingVariant m_currentVariant;
-    Automaton m_expectedTarget;
     QString m_archivePath;
     QString m_progressPath;
     bool m_hasVariant = false;

@@ -1,4 +1,5 @@
 #include "domain/conversionservice.h"
+#include "domain/reactionchecker.h"
 #include "domain/equivalencechecker.h"
 #include "domain/isomorphismchecker.h"
 #include "infrastructure/progressstore.h"
@@ -14,6 +15,7 @@
 #include <openssl/evp.h>
 
 #include <iostream>
+#include <algorithm>
 #include <memory>
 
 namespace {
@@ -36,80 +38,74 @@ Automaton sampleMoore() {
     return result;
 }
 
-QByteArray archiveKeyMaterial() {
-    const QByteArray left = QByteArray::fromHex(
-        "e758d0ffb756c99a9fed62dbb728a1e4cb06939e6d0d017dbb321b89a262c6e8");
-    const QByteArray right = QByteArray::fromHex(
-        "91ed552426a3a7bc31a8c75f11d2ec96aec327628668c5aa074e99718add5531");
-    QByteArray result(32, Qt::Uninitialized);
-    for (int i = 0; i < result.size(); ++i) result[i] = left[i] ^ right[i];
-    return result;
+
 }
 
-QByteArray makeCompatibleArchive() {
-    QJsonObject first{{QStringLiteral("nextState"), QStringLiteral("b")},
-                      {QStringLiteral("outputs"), QJsonArray{}}};
-    QJsonObject second{{QStringLiteral("nextState"), QStringLiteral("a")},
-                       {QStringLiteral("outputs"), QJsonArray{}}};
-    QJsonObject mooreOutputs{{QStringLiteral("a"), QJsonArray{QStringLiteral("y")}},
-                             {QStringLiteral("b"), QJsonArray{QStringLiteral("y")}}};
-    QJsonObject variant{{QStringLiteral("number"), 7},
-                        {QStringLiteral("type"), QStringLiteral("MooreToMealy")},
-                        {QStringLiteral("states"), QJsonArray{QStringLiteral("a"), QStringLiteral("b")}},
-                        {QStringLiteral("inputs"), QJsonArray{QStringLiteral("x")}},
-                        {QStringLiteral("outputs"), QJsonArray{QStringLiteral("y")}},
-                        {QStringLiteral("initialState"), QStringLiteral("a")},
-                        {QStringLiteral("imageName"), QStringLiteral("task.png")},
-                        {QStringLiteral("imageData"), QString::fromLatin1(QByteArray("image").toBase64())},
-                        {QStringLiteral("transitions"), QJsonArray{QJsonArray{first, second}}},
-                        {QStringLiteral("mooreOutputs"), mooreOutputs}};
-    QJsonObject root{{QStringLiteral("format"), QStringLiteral("M2MTools")},
-                     {QStringLiteral("version"), 1},
-                     {QStringLiteral("variants"), QJsonArray{variant}}};
-    const QByteArray plain = QJsonDocument(root).toJson(QJsonDocument::Compact);
-    const QByteArray magic("M2MTOOLS2");
-    const QByteArray salt(16, 's');
-    const QByteArray nonce(12, 'n');
-    QByteArray key(32, Qt::Uninitialized);
-    const QByteArray material = archiveKeyMaterial();
-    require(PKCS5_PBKDF2_HMAC(material.constData(), material.size(),
-            reinterpret_cast<const unsigned char*>(salt.constData()), salt.size(),
-            200000, EVP_sha256(), key.size(),
-            reinterpret_cast<unsigned char*>(key.data())) == 1,
-            "test archive key is derived");
-    using Context = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
-    Context context(EVP_CIPHER_CTX_new(), &EVP_CIPHER_CTX_free);
-    require(bool(context), "test cipher context created");
-    require(EVP_EncryptInit_ex(context.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr) == 1 &&
-            EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_IVLEN, nonce.size(), nullptr) == 1 &&
-            EVP_EncryptInit_ex(context.get(), nullptr, nullptr,
-                reinterpret_cast<const unsigned char*>(key.constData()),
-                reinterpret_cast<const unsigned char*>(nonce.constData())) == 1,
-            "test archive cipher initialized");
-    int written = 0;
-    require(EVP_EncryptUpdate(context.get(), nullptr, &written,
-            reinterpret_cast<const unsigned char*>(magic.constData()), magic.size()) == 1,
-            "test archive AAD added");
-    QByteArray encrypted(plain.size() + EVP_MAX_BLOCK_LENGTH, Qt::Uninitialized);
-    int total = 0;
-    require(EVP_EncryptUpdate(context.get(),
-            reinterpret_cast<unsigned char*>(encrypted.data()), &written,
-            reinterpret_cast<const unsigned char*>(plain.constData()), plain.size()) == 1,
-            "test archive encrypted");
-    total = written;
-    require(EVP_EncryptFinal_ex(context.get(),
-            reinterpret_cast<unsigned char*>(encrypted.data()) + total, &written) == 1,
-            "test archive encryption finalized");
-    encrypted.resize(total + written);
-    QByteArray tag(16, Qt::Uninitialized);
-    require(EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_GET_TAG, tag.size(), tag.data()) == 1,
-            "test archive tag created");
-    return magic + salt + nonce + tag + encrypted;
-}
-}
+#include "tests/archivefixture.h"
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
+    const auto task = trainingVariant();
+    Automaton reactionMoore;
+    reactionMoore.kind = AutomatonKind::Moore;
+    reactionMoore.states = {"a0", "a1", "a2"};
+    reactionMoore.initialState = 0;
+    reactionMoore.inputs = {"x1", "x2"};
+    reactionMoore.outputs = {"y0", "y2", "y3"};
+    reactionMoore.mooreOutputs = {{1}, {0, 2}, {}};
+    reactionMoore.transitions = {{0, 1, 1, {}}, {1, 0, 0, {}},
+                                 {1, 1, 2, {}}, {2, 0, 0, {}}};
+    require(ReactionChecker::check(task, reactionMoore).accepted,
+            "Moore consumes ordered reaction from a0 using destination outputs");
+    auto broken = reactionMoore;
+    broken.mooreOutputs[1] = {0};
+    require(ReactionChecker::check(task, broken).step == 0,
+            "first incorrect output is identified");
+    broken = reactionMoore;
+    broken.transitions.removeLast();
+    require(ReactionChecker::check(task, broken).step == 4,
+            "missing transition reports exact late step");
+    broken = reactionMoore;
+    broken.initialState = 1;
+    require(!ReactionChecker::check(task, broken).accepted, "initial state must be a0");
+    broken = reactionMoore;
+    broken.states[0] = "q0";
+    require(!ReactionChecker::check(task, broken).accepted, "state names are canonical");
+    broken = reactionMoore;
+    broken.inputs[1] = "x9";
+    require(!ReactionChecker::check(task, broken).accepted, "signals are not silently renamed");
+    broken = reactionMoore;
+    broken.outputs[0] = "y10";
+    require(!ReactionChecker::check(task, broken).accepted, "two-digit signals are invalid");
+    auto reordered = task;
+    std::swap(reordered.reaction[0], reordered.reaction[1]);
+    require(!ReactionChecker::check(reordered, reactionMoore).accepted,
+            "reaction order affects the verdict");
+    reordered = task;
+    reordered.reaction[0].outputs = {"y0", "y3"};
+    require(ReactionChecker::check(reordered, reactionMoore).accepted,
+            "outputs within one clock tick are a set");
+    Automaton reactionMealy;
+    reactionMealy.kind = AutomatonKind::Mealy;
+    reactionMealy.states = {"a0", "a1"};
+    reactionMealy.initialState = 0;
+    reactionMealy.inputs = reactionMoore.inputs;
+    reactionMealy.outputs = reactionMoore.outputs;
+    reactionMealy.transitions = {{0, 1, 1, {0, 2}}, {1, 0, 0, {1}}, {1, 1, 1, {}}};
+    require(ReactionChecker::check(task, reactionMealy).accepted,
+            "Mealy uses its own counts and is checked against the same trace");
+    auto wrongCounts = task;
+    wrongCounts.mealy.states = 3;
+    require(!ReactionChecker::check(wrongCounts, reactionMealy).accepted &&
+             ReactionChecker::check(wrongCounts, reactionMoore).accepted,
+            "counts are selected separately for each automaton kind");
+    wrongCounts = task;
+    wrongCounts.mealy.outputs = 2;
+    require(!ReactionChecker::check(wrongCounts, reactionMealy).accepted,
+            "actual distinct output count must match the task");
+    wrongCounts.direction = ConversionDirection::MealyToMoore;
+    require(!ReactionChecker::check(wrongCounts, reactionMoore).accepted,
+            "unfinished conversion is unavailable in the checker");
     const Automaton expected = sampleMoore();
     Automaton renamed;
     renamed.kind = AutomatonKind::Moore;
@@ -195,7 +191,13 @@ int main(int argc, char** argv) {
     QList<TrainingVariant> variants;
     require(VariantArchive::load(archivePath, &variants, &error) &&
             variants.size() == 1 && variants.first().number == 7 &&
-            variants.first().source.kind == AutomatonKind::Moore,
+            variants.first().direction == ConversionDirection::MooreToMealy &&
+            variants.first().moore.states == 3 && variants.first().mealy.states == 2 &&
+            variants.first().diagram == trainingVariant().diagram &&
+            variants.first().reaction[0].input == "x2" &&
+            variants.first().reaction[0].outputs == QStringList({"y3", "y0"}) &&
+            variants.first().reaction[1].input == "x1" &&
+            variants.first().reaction[3].outputs.isEmpty(),
             "M2MTools-compatible encrypted BazaVar is loaded");
     QByteArray modified = archive;
     modified[modified.size() - 1] ^= 1;
@@ -205,6 +207,45 @@ int main(int argc, char** argv) {
     archiveFile.close();
     require(!VariantArchive::load(archivePath, &variants, &error),
             "authenticated BazaVar modification is rejected");
+    // Authenticated payload validation is separate from decryption.
+    auto loadRoot = [&](const QJsonObject& root) {
+        require(archiveFile.open(QIODevice::WriteOnly | QIODevice::Truncate), "fixture reopens");
+        archiveFile.write(makeCompatibleArchive(root));
+        archiveFile.close();
+        return VariantArchive::load(archivePath, &variants, &error);
+    };
+    auto root = trainingArchiveJson();
+    auto malformed = trainingVariantJson();
+    malformed.insert("moore", QJsonObject{{"states", 3}, {"inputs", 1}, {"outputs", 3}});
+    root.insert("variants", QJsonArray{malformed});
+    require(!loadRoot(root), "source counts inconsistent with trace are rejected");
+    malformed = trainingVariantJson();
+    auto steps = malformed.value("reaction").toArray();
+    steps[0] = QJsonObject{{"input", "x2"}, {"outputs", QJsonArray{"y3", "y3"}}};
+    malformed.insert("reaction", steps);
+    root.insert("variants", QJsonArray{malformed});
+    require(!loadRoot(root), "duplicate outputs in an archived tick are rejected");
+    malformed = trainingVariantJson();
+    malformed.insert("image", QJsonObject{{"fileName", "broken.png"}, {"data", "!!!!"}});
+    root.insert("variants", QJsonArray{malformed});
+    require(!loadRoot(root), "corrupted image is rejected");
+    root.insert("variants", QJsonArray{trainingVariantJson(), trainingVariantJson()});
+    require(!loadRoot(root), "duplicate task numbers are rejected");
+    root = trainingArchiveJson();
+    root.insert("format", "M2MTools");
+    require(!loadRoot(root), "old full-automaton payload is rejected");
+    require(variants.size() == 1 && variants.first().reaction.size() == 5,
+            "failed imports do not overwrite the loaded task list");
+    if (argc > 1) {
+        require(VariantArchive::load(QString::fromLocal8Bit(argv[1]), &variants, &error) &&
+                variants.size() == 1 && variants.first().number == 7 &&
+                variants.first().moore.states == 3 && variants.first().mealy.states == 2 &&
+                variants.first().reaction.size() == 5 &&
+                variants.first().reaction[0].outputs == QStringList({"y3", "y0"}) &&
+                ReactionChecker::check(variants.first(), reactionMoore).accepted &&
+                ReactionChecker::check(variants.first(), reactionMealy).accepted,
+                "real M2MTools export preserves image, counts and ordered reaction");
+    }
     std::cout << "PASS conversion, behavioral equivalence, graph isomorphism, BazaVar and progress round trip\n";
     return 0;
 }
