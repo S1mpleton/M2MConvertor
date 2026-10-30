@@ -3,8 +3,11 @@
 
 struct ReactionCheckResult {
     bool accepted = false;
-    QString explanation;
-    int step = -1; // Zero-based first mismatch; -1 for structural errors.
+    Result result;
+    int step = -1;
+    ReactionCheckResult(bool accepted, const Message& message, int step = -1)
+        : accepted(accepted), result(accepted ? Result::success(message, ResultCategory::Validation)
+                                             : Result::error(message, ResultCategory::Validation)), step(step) {}
 };
 
 class ReactionChecker {

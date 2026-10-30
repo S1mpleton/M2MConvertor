@@ -6,7 +6,7 @@
 class HintSplitter : public QSplitter {
     Q_OBJECT
   public:
-    HintSplitter(const QString& title, QWidget* hint, QWidget* work, const QString& name,
+    HintSplitter(const char* title, QWidget* hint, QWidget* work, const QString& name,
                  Qt::Orientation orientation = Qt::Vertical, QWidget* parent = nullptr);
     bool expanded() const;
     void setExpanded(bool expanded);

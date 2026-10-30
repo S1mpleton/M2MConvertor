@@ -1,3 +1,4 @@
+#include "domain/result.h"
 #include "domain/automaton.h"
 
 #include <QJsonArray>
@@ -51,8 +52,8 @@ bool namesValid(const QStringList& names) {
 }
 
 QString automatonKindName(AutomatonKind kind) {
-    return kind == AutomatonKind::Mealy ? QStringLiteral("Мили")
-                                         : QStringLiteral("Мура");
+    return kind == AutomatonKind::Mealy ? QCoreApplication::translate("Result", "Мили")
+                                         : QCoreApplication::translate("Result", "Мура");
 }
 
 const Transition* Automaton::transition(int state, int inputIndex) const {
@@ -62,46 +63,47 @@ const Transition* Automaton::transition(int state, int inputIndex) const {
     return nullptr;
 }
 
-bool Automaton::validate(QString* error) const {
-    auto fail = [error](const QString& message) {
-        if (error) *error = message;
-        return false;
-    };
-    if (states.isEmpty()) return fail(QStringLiteral("Список состояний пуст."));
-    if (inputs.isEmpty()) return fail(QStringLiteral("Список входных сигналов пуст."));
-    if (outputs.isEmpty()) return fail(QStringLiteral("Список выходных сигналов пуст."));
+Result Automaton::validation() const {
+    auto fail = [](const Message& message) { return Result::error(message, ResultCategory::Validation); };
+    if (states.isEmpty()) return fail(Message(QT_TRANSLATE_NOOP("Result", "Список состояний пуст.")));
+    if (inputs.isEmpty()) return fail(Message(QT_TRANSLATE_NOOP("Result", "Список входных сигналов пуст.")));
+    if (outputs.isEmpty()) return fail(Message(QT_TRANSLATE_NOOP("Result", "Список выходных сигналов пуст.")));
     if (!namesValid(states) || !namesValid(inputs) || !namesValid(outputs))
-        return fail(QStringLiteral("Имена должны быть непустыми и уникальными внутри списка."));
+        return fail(Message(QT_TRANSLATE_NOOP("Result", "Имена должны быть непустыми и уникальными внутри списка.")));
     if (initialState < 0 || initialState >= states.size())
-        return fail(QStringLiteral("Начальное состояние не входит в список состояний."));
+        return fail(Message(QT_TRANSLATE_NOOP("Result", "Начальное состояние не входит в список состояний.")));
     if (kind == AutomatonKind::Moore && mooreOutputs.size() != states.size())
-        return fail(QStringLiteral("Не заданы выходы всех состояний автомата Мура."));
+        return fail(Message(QT_TRANSLATE_NOOP("Result", "Не заданы выходы всех состояний автомата Мура.")));
 
     QSet<quint64> cells;
     for (const Transition& edge : transitions) {
         if (edge.from < 0 || edge.from >= states.size() ||
             edge.to < 0 || edge.to >= states.size() ||
             edge.input < 0 || edge.input >= inputs.size())
-            return fail(QStringLiteral("Переход содержит неизвестное состояние или вход."));
+            return fail(Message(QT_TRANSLATE_NOOP("Result", "Переход содержит неизвестное состояние или вход.")));
         const quint64 key = (quint64(quint32(edge.from)) << 32) |
                             quint32(edge.input);
         if (cells.contains(key))
-            return fail(QStringLiteral("Для состояния и входа задано несколько переходов."));
+            return fail(Message(QT_TRANSLATE_NOOP("Result", "Для состояния и входа задано несколько переходов.")));
         cells.insert(key);
         for (int output : edge.outputs) {
             if (output < 0 || output >= outputs.size())
-                return fail(QStringLiteral("Переход содержит неизвестный выход."));
+                return fail(Message(QT_TRANSLATE_NOOP("Result", "Переход содержит неизвестный выход.")));
         }
         if (kind == AutomatonKind::Moore && !edge.outputs.isEmpty())
-            return fail(QStringLiteral("Выход автомата Мура должен относиться к состоянию."));
+            return fail(Message(QT_TRANSLATE_NOOP("Result", "Выход автомата Мура должен относиться к состоянию.")));
     }
     for (const QSet<int>& stateOutputs : mooreOutputs) {
         for (int output : stateOutputs) {
             if (output < 0 || output >= outputs.size())
-                return fail(QStringLiteral("Состояние содержит неизвестный выход."));
+                return fail(Message(QT_TRANSLATE_NOOP("Result", "Состояние содержит неизвестный выход.")));
         }
     }
-    return true;
+    return Result::success();
+}
+
+bool Automaton::validate(QString* error) const {
+    const auto result = validation(); if (error && !result.ok()) *error = result.text(); return result.ok();
 }
 
 QJsonObject Automaton::toJson() const {
@@ -138,19 +140,19 @@ bool Automaton::fromJson(const QJsonObject& object, Automaton* result,
     if (kindName == QStringLiteral("Mealy")) parsed.kind = AutomatonKind::Mealy;
     else if (kindName == QStringLiteral("Moore")) parsed.kind = AutomatonKind::Moore;
     else {
-        if (error) *error = QStringLiteral("Неизвестный тип автомата.");
+        if (error) *error = Message(QT_TRANSLATE_NOOP("Result", "Неизвестный тип автомата.")).text();
         return false;
     }
     if (!stringsFromJson(object.value(QStringLiteral("states")), &parsed.states) ||
         !stringsFromJson(object.value(QStringLiteral("inputs")), &parsed.inputs) ||
         !stringsFromJson(object.value(QStringLiteral("outputs")), &parsed.outputs)) {
-        if (error) *error = QStringLiteral("Повреждены списки имён автомата.");
+        if (error) *error = Message(QT_TRANSLATE_NOOP("Result", "Повреждены списки имён автомата.")).text();
         return false;
     }
     parsed.initialState = object.value(QStringLiteral("initialState")).toInt(-1);
     const QJsonValue edgeValue = object.value(QStringLiteral("transitions"));
     if (!edgeValue.isArray()) {
-        if (error) *error = QStringLiteral("Повреждён список переходов.");
+        if (error) *error = Message(QT_TRANSLATE_NOOP("Result", "Повреждён список переходов.")).text();
         return false;
     }
     for (const QJsonValue& value : edgeValue.toArray()) {

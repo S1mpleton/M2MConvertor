@@ -22,6 +22,7 @@ public:
 
     void setTask(const TrainingVariant& task, AutomatonKind kind);
     void resetEditor();
+    void retranslateTexts();
     bool completed() const { return m_graphAccepted; }
     Automaton acceptedAutomaton() const { return m_graphAutomaton; }
     QJsonObject toJson() const;
@@ -29,33 +30,29 @@ public:
 
 signals:
     void completedChanged(bool completed);
-    void feedbackRequested(const QString& text, bool success);
+    void feedbackRequested(const Result& result);
 
 private:
-    struct CandidateCheck {
-        bool accepted = false;
-        QString explanation;
-    };
-
     QWidget* createTablePage();
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
     void configureTable();
     void fillEmptyCells(QTableWidget* table) const;
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
-    bool readTable(Automaton* result, QString* error) const;
+    bool readTable(Automaton* result, Message* error) const;
     void configureMatrix();
     void updateReference(QTableWidget* table) const;
-    bool readMatrix(Automaton* result, QString* error) const;
-    bool readGraph(Automaton* result, QString* error) const;
+    bool readMatrix(Automaton* result, Message* error) const;
+    bool readGraph(Automaton* result, Message* error) const;
     void acceptTable();
     void acceptMatrix();
     void acceptGraph();
     void invalidateFromTable();
     void invalidateFromMatrix();
     void invalidateGraph();
-    void showFeedback(const QString& message, bool success);
-    CandidateCheck checkCandidate(const Automaton& candidate, bool graph = false) const;
+    void showFeedback(const Message& message, bool success, int page = 1);
+    Message validationContext(int page) const;
+    Result checkCandidate(const Automaton& candidate, bool graph = false) const;
     QSet<int> parseOutputs(const QString& text, Automaton& automaton,
                            bool* ok) const;
     QJsonArray tableToJson(const QTableWidget* table) const;

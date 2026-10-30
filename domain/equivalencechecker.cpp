@@ -114,29 +114,26 @@ EquivalenceResult EquivalenceChecker::compare(const Automaton& first,
                                               const Automaton& second) {
     QString error;
     if (!first.validate(&error))
-        return {false, QStringLiteral("Эталонный автомат некорректен: %1").arg(error)};
+        return {false, QCoreApplication::translate("Legacy", "Эталонный автомат некорректен: %1").arg(error)};
     if (!second.validate(&error))
-        return {false, QStringLiteral("Введённый автомат некорректен: %1").arg(error)};
+        return {false, QCoreApplication::translate("Legacy", "Введённый автомат некорректен: %1").arg(error)};
     if (first.inputs.size() != second.inputs.size())
-        return {false, QStringLiteral("Не совпадает число входных сигналов.")};
+        return {false, QCoreApplication::translate("Legacy", "Не совпадает число входных сигналов.")};
     if (first.outputs.size() != second.outputs.size())
-        return {false, QStringLiteral("Не совпадает число выходных сигналов.")};
+        return {false, QCoreApplication::translate("Legacy", "Не совпадает число выходных сигналов.")};
 
     const Automaton firstMinimal = minimizedReachable(reactionModel(first));
     const Automaton secondMinimal = minimizedReachable(reactionModel(second));
     if (firstMinimal.states.size() != secondMinimal.states.size()) {
-        return {false, QStringLiteral(
-            "Автоматы неэквивалентны: после удаления недостижимых состояний и минимизации "
+        return {false, QCoreApplication::translate("Legacy", "Автоматы неэквивалентны: после удаления недостижимых состояний и минимизации "
             "получено разное число различимых состояний (%1 и %2).")
             .arg(firstMinimal.states.size()).arg(secondMinimal.states.size())};
     }
     const IsomorphismResult minimalCheck =
         IsomorphismChecker::compare(firstMinimal, secondMinimal);
     if (!minimalCheck.equivalent) {
-        return {false, QStringLiteral(
-            "Автоматы неэквивалентны: их реакции различаются хотя бы для одной "
+        return {false, QCoreApplication::translate("Legacy", "Автоматы неэквивалентны: их реакции различаются хотя бы для одной "
             "входной последовательности.")};
     }
-    return {true, QStringLiteral(
-        "Верно. Автоматы поведенчески эквивалентны для всех входных последовательностей.")};
+    return {true, QCoreApplication::translate("Legacy", "Верно. Автоматы поведенчески эквивалентны для всех входных последовательностей.")};
 }

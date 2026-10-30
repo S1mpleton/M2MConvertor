@@ -1,5 +1,6 @@
 #pragma once
 #include <QImage>
+#include <QEvent>
 #include <QPainter>
 #include <QWidget>
 
@@ -29,6 +30,10 @@ class TaskImage : public QWidget {
     }
 
   protected:
+    void changeEvent(QEvent* event) override {
+        QWidget::changeEvent(event);
+        if (event->type() == QEvent::LanguageChange) update();
+    }
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
         if (m_image.isNull()) {

@@ -1,6 +1,7 @@
 #ifndef AUTOMATON_H
 #define AUTOMATON_H
 
+#include "domain/result.h"
 #include <QJsonObject>
 #include <QSet>
 #include <QStringList>
@@ -28,6 +29,7 @@ struct Automaton {
     QVector<QSet<int>> mooreOutputs;
 
     const Transition* transition(int state, int input) const;
+    Result validation() const;
     bool validate(QString* error = nullptr) const;
     QJsonObject toJson() const;
     static bool fromJson(const QJsonObject& object, Automaton* result,

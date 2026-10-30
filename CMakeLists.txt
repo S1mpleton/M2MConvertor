@@ -8,6 +8,8 @@ find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS Crypto)
 qt_standard_project_setup()
 
 add_library(M2MConvertorCore STATIC
+    domain/message.h domain/result.cpp domain/result.h
+    infrastructure/logger.cpp infrastructure/logger.h
     domain/automaton.cpp domain/automaton.h
     domain/trainingvariant.h domain/reactionchecker.cpp domain/reactionchecker.h
     domain/conversionservice.cpp domain/conversionservice.h
@@ -19,6 +21,8 @@ target_include_directories(M2MConvertorCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(M2MConvertorCore PUBLIC Qt::Core Qt::Gui OpenSSL::Crypto)
 
 add_library(M2MConvertorUi STATIC
+    infrastructure/translationmanager.cpp infrastructure/translationmanager.h
+    ui/uitext.cpp ui/uitext.h ui/logwindow.cpp ui/logwindow.h ui/logwindow.ui
     ui/mealycelldelegate.cpp ui/mealycelldelegate.h
     ui/plaincelldelegate.cpp ui/plaincelldelegate.h
     ui/widgets/workscrollarea.cpp ui/widgets/workscrollarea.h
@@ -32,7 +36,7 @@ target_link_libraries(M2MConvertorUi PUBLIC M2MConvertorCore Qt::Widgets)
 
 qt_add_executable(M2MConvertor WIN32 MACOSX_BUNDLE main.cpp)
 target_link_libraries(M2MConvertor PRIVATE M2MConvertorUi)
-qt_add_translations(TARGETS M2MConvertor TS_FILES M2MConvertor_ru_RU.ts)
+set(TRANSLATION_TARGETS M2MConvertor)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -43,10 +47,17 @@ if(BUILD_TESTING)
 
     qt_add_executable(M2MConvertorGuiSmoke tests/gui_smoke.cpp)
     target_link_libraries(M2MConvertorGuiSmoke PRIVATE M2MConvertorUi Qt::Test)
+    list(APPEND TRANSLATION_TARGETS M2MConvertorGuiSmoke)
     add_test(NAME M2MConvertorGuiStartup COMMAND M2MConvertorGuiSmoke)
     set_tests_properties(M2MConvertorGuiStartup PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
+
+get_target_property(CORE_TRANSLATION_SOURCES M2MConvertorCore SOURCES)
+get_target_property(UI_TRANSLATION_SOURCES M2MConvertorUi SOURCES)
+qt_add_translations(TARGETS ${TRANSLATION_TARGETS}
+    TS_FILES M2MConvertor_ru_RU.ts M2MConvertor_en.ts
+    SOURCES ${CORE_TRANSLATION_SOURCES} ${UI_TRANSLATION_SOURCES} main.cpp)
 
 install(TARGETS M2MConvertor
     BUNDLE DESTINATION .

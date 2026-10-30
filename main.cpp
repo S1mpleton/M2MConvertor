@@ -1,3 +1,5 @@
+#include "infrastructure/translationmanager.h"
+#include "infrastructure/logger.h"
 #include "mainwindow.h"
 
 #include <QApplication>
@@ -11,15 +13,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName(QStringLiteral("M2M"));
     QCoreApplication::setApplicationName(QStringLiteral("M2MConvertor"));
 
-    QTranslator translator;
-    const QStringList uiLanguages = QLocale::system().uiLanguages();
-    for (const QString &locale : uiLanguages) {
-        const QString baseName = "M2MConvertor_" + QLocale(locale).name();
-        if (translator.load(":/i18n/" + baseName)) {
-            a.installTranslator(&translator);
-            break;
-        }
-    }
+    Logger::instance().log(TranslationManager::instance().loadPreference());
     MainWindow w;
     w.show();
     return QApplication::exec();

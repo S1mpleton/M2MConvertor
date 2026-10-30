@@ -1,3 +1,10 @@
+#include "infrastructure/logger.h"
+#include "infrastructure/translationmanager.h"
+#include "ui/logwindow.h"
+#include <QActionGroup>
+#include <QEvent>
+#include <QSignalBlocker>
+#include "ui/uitext.h"
 #include "mainwindow.h"
 
 #include "infrastructure/progressstore.h"
@@ -47,7 +54,7 @@ constexpr int kLandingPage = 0;
 constexpr int kWorkspacePage = 1;
 
 QString automatonSummary(const Automaton& automaton) {
-    return QStringLiteral("%1: %2 состояний, %3 входов, %4 выходов, %5 переходов")
+    return QCoreApplication::translate("Report", "%1: %2 состояний, %3 входов, %4 выходов, %5 переходов")
         .arg(automatonKindName(automaton.kind))
         .arg(automaton.states.size()).arg(automaton.inputs.size())
         .arg(automaton.outputs.size()).arg(automaton.transitions.size());
@@ -55,7 +62,7 @@ QString automatonSummary(const Automaton& automaton) {
 }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowTitle(tr("M2MConvertor — эквивалентные автоматы"));
+    UiText::bind(this, "windowTitle", QT_TRANSLATE_NOOP("App", "M2MConvertor — эквивалентные автоматы"));
     m_pages = new QStackedWidget;
     m_pages->addWidget(createLandingPage());
     m_pages->addWidget(createWorkspacePage());
@@ -76,7 +83,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_notification, &FeedbackLabel::activeChanged, notificationArea, &QWidget::setVisible);
     notificationArea->hide();
     for (auto* editor : {m_sourceEditor, m_targetEditor})
-        connect(editor, &AutomatonEditor::feedbackRequested, this, &MainWindow::setFeedback);
+        connect(editor, &AutomatonEditor::feedbackRequested, this, &MainWindow::showResult);
+    connect(&TranslationManager::instance(), &TranslationManager::languageChanged, this, &MainWindow::refreshTexts);
+    connect(m_notification, &FeedbackLabel::expired, this, [this] { m_lastResult.reset(); });
+    m_ready = true;
+    refreshTexts();
+    Logger::instance().log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Приложение запущено."))));
     layout()->activate();
     resize(minimumSizeHint().expandedTo(QSize(0, 0)));
 }
@@ -97,7 +109,7 @@ QWidget* MainWindow::createLandingPage() {
     outer->setContentsMargins(36, 28, 36, 32);
     outer->setSpacing(18);
     auto* title = new WrappingLabel;
-    title->setText(tr("Преобразование конечных автоматов Мили и Мура"));
+    UiText::bind(title, "text", QT_TRANSLATE_NOOP("App", "Преобразование конечных автоматов Мили и Мура"));
     title->setObjectName(QStringLiteral("landingTitle"));
     QFont titleFont = title->font();
     titleFont.setPointSize(17);
@@ -105,8 +117,7 @@ QWidget* MainWindow::createLandingPage() {
     title->setFont(titleFont);
     title->setAlignment(Qt::AlignCenter);
     auto* explanation = new WrappingLabel;
-    explanation->setText(tr(
-        "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
+    UiText::bind(explanation, "text", QT_TRANSLATE_NOOP("App", "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
         "Направление преобразования определяется самим вариантом."));
     explanation->setWordWrap(true);
     explanation->setAlignment(Qt::AlignCenter);
@@ -119,34 +130,32 @@ QWidget* MainWindow::createLandingPage() {
     contentLayout->setContentsMargins(0, 12, 0, 12);
     contentLayout->setSpacing(24);
 
-    auto* archiveGroup = new QGroupBox(tr("1. База вариантов"));
+    auto* archiveGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "1. База вариантов"));
     auto* archiveLayout = new QVBoxLayout(archiveGroup);
     archiveLayout->setContentsMargins(20, 24, 20, 20);
     archiveLayout->setSpacing(14);
     auto* archiveHint = new WrappingLabel;
-    archiveHint->setText(tr(
-        "Выберите файл .m2m с реакциями, экспортированный из M2MTools. "
+    UiText::bind(archiveHint, "text", QT_TRANSLATE_NOOP("App", "Выберите файл .m2m с реакциями, экспортированный из M2MTools. "
         "Приложение проверит целостность архива перед показом вариантов."));
     archiveHint->setWordWrap(true);
     archiveLayout->addWidget(archiveHint);
     m_archivePathLabel = new WrappingLabel;
-    m_archivePathLabel->setText(tr("BazaVar не выбран"));
+    UiText::bind(m_archivePathLabel, "text", QT_TRANSLATE_NOOP("App", "BazaVar не выбран"));
     m_archivePathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_archivePathLabel->setWordWrap(true);
-    auto* archiveButton = new QPushButton(tr("Открыть BazaVar…"));
+    auto* archiveButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть BazaVar…"));
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     archiveLayout->addWidget(m_archivePathLabel);
     archiveLayout->addWidget(archiveButton, 0, Qt::AlignLeft);
     archiveLayout->addStretch();
 
-    auto* variantGroup = new QGroupBox(tr("2. Вариант работы"));
+    auto* variantGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "2. Вариант работы"));
     auto* variantLayout = new QVBoxLayout(variantGroup);
     variantLayout->setContentsMargins(20, 24, 20, 20);
     variantLayout->setSpacing(14);
     auto* variantHint = new WrappingLabel;
-    variantHint->setText(tr(
-        "Выберите номер варианта. Направление преобразования уже задано в базе "
+    UiText::bind(variantHint, "text", QT_TRANSLATE_NOOP("App", "Выберите номер варианта. Направление преобразования уже задано в базе "
         "и будет выбрано автоматически."));
     variantHint->setWordWrap(true);
     variantLayout->addWidget(variantHint);
@@ -156,10 +165,10 @@ QWidget* MainWindow::createLandingPage() {
     m_variantCombo->setObjectName("variantCombo");
     m_variantCombo->setEnabled(false);
     m_landingDirection = new WrappingLabel;
-    m_landingDirection->setText(tr("—"));
+    UiText::bind(m_landingDirection, "text", QT_TRANSLATE_NOOP("App", "—"));
     m_landingDirection->setWordWrap(true);
-    form->addRow(tr("Вариант:"), m_variantCombo);
-    form->addRow(tr("Преобразование:"), m_landingDirection);
+    UiText::row(form, QT_TRANSLATE_NOOP("App", "Вариант:"), m_variantCombo);
+    UiText::row(form, QT_TRANSLATE_NOOP("App", "Преобразование:"), m_landingDirection);
     variantLayout->addLayout(form);
     variantLayout->addStretch();
 
@@ -168,18 +177,17 @@ QWidget* MainWindow::createLandingPage() {
     outer->addWidget(content, 1);
 
     auto* actionHint = new WrappingLabel;
-    actionHint->setText(tr(
-        "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
+    UiText::bind(actionHint, "text", QT_TRANSLATE_NOOP("App", "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
     actionHint->setAlignment(Qt::AlignCenter);
     actionHint->setWordWrap(true);
     outer->addWidget(actionHint);
     auto* actions = new QHBoxLayout;
-    m_beginButton = new QPushButton(tr("Создать работу"));
+    m_beginButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
     m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
     m_beginButton->setEnabled(false);
     m_beginButton->setDefault(true);
     m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    auto* openProgressButton = new QPushButton(tr("Открыть сохранённую работу…"));
+    auto* openProgressButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
     openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
     openProgressButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     actions->addStretch();
@@ -200,7 +208,7 @@ QWidget* MainWindow::createWorkspacePage() {
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(10, 10, 10, 10);
     auto* top = new QHBoxLayout;
-    auto* back = new QPushButton(tr("К выбору варианта"));
+    auto* back = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "К выбору варианта"));
     back->setIcon(AppIcons::icon(AppIcons::Kind::Back));
     m_variantTitle = new WrappingLabel;
     QFont font = m_variantTitle->font();
@@ -213,14 +221,14 @@ QWidget* MainWindow::createWorkspacePage() {
     layout->addLayout(top);
     m_workflowTabs = new WorkflowTabs;
     m_workflowTabs->setObjectName(QStringLiteral("workflowTabs"));
-    m_workflowTabs->addTab(createStartPage(), tr("Начало работы"));
+    UiText::tab(m_workflowTabs, createStartPage(), QT_TRANSLATE_NOOP("App", "Начало работы"));
     m_sourceEditor = new AutomatonEditor;
     m_sourceEditor->setObjectName("sourceEditor");
     m_targetEditor = new AutomatonEditor;
     m_targetEditor->setObjectName("targetEditor");
-    m_workflowTabs->addTab(m_sourceEditor, tr("Автомат Мура"));
-    m_workflowTabs->addTab(m_targetEditor, tr("Автомат Мили"));
-    m_workflowTabs->addTab(createReportPage(), tr("Отчёт"));
+    UiText::tab(m_workflowTabs, m_sourceEditor, QT_TRANSLATE_NOOP("App", "Автомат Мура"));
+    UiText::tab(m_workflowTabs, m_targetEditor, QT_TRANSLATE_NOOP("App", "Автомат Мили"));
+    UiText::tab(m_workflowTabs, createReportPage(), QT_TRANSLATE_NOOP("App", "Отчёт"));
     m_workflowTabs->setTabEnabled(1, false);
     m_workflowTabs->setTabEnabled(2, false);
     m_workflowTabs->setTabEnabled(3, false);
@@ -255,16 +263,15 @@ QWidget* MainWindow::createStartPage() {
     auto* right = new QVBoxLayout(workPanel);
     right->setContentsMargins(0, 0, 0, 0);
     right->setSpacing(14);
-    auto* instructionsGroup = new QGroupBox(tr("Порядок работы"));
+    auto* instructionsGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Порядок работы"));
     auto* instructionsLayout = new QVBoxLayout(instructionsGroup);
     auto* instructions = new WrappingLabel;
-    instructions->setText(tr(
-        "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
+    UiText::bind(instructions, "text", QT_TRANSLATE_NOOP("App", "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
         "ответа откроется последовательная работа с таблицей, матрицей и графом."));
     instructions->setWordWrap(true);
     instructionsLayout->addWidget(instructions);
     right->addWidget(instructionsGroup);
-    auto* counts = new QGroupBox(tr("Проверьте структуру исходного автомата"));
+    auto* counts = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Проверьте структуру исходного автомата"));
     auto* countLayout = new QFormLayout(counts);
     countLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     countLayout->setRowWrapPolicy(QFormLayout::WrapLongRows);
@@ -274,10 +281,10 @@ QWidget* MainWindow::createStartPage() {
     m_stateCount->setRange(1, 999999);
     m_inputCount->setRange(1, 10);
     m_outputCount->setRange(1, 10);
-    countLayout->addRow(tr("Количество состояний:"), m_stateCount);
-    countLayout->addRow(tr("Количество входных сигналов:"), m_inputCount);
-    countLayout->addRow(tr("Количество выходных сигналов:"), m_outputCount);
-    auto* accept = new QPushButton(tr("Принять"));
+    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество состояний:"), m_stateCount);
+    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество входных сигналов:"), m_inputCount);
+    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество выходных сигналов:"), m_outputCount);
+    auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
     accept->setObjectName(QStringLiteral("acceptCountsButton"));
     accept->setDefault(true);
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
@@ -285,7 +292,7 @@ QWidget* MainWindow::createStartPage() {
     right->addWidget(counts);
     right->addStretch();
     auto* workScroll = new WorkScrollArea(workPanel);
-    auto* splitter = new HintSplitter(tr("Задание варианта"), m_diagramLabel, workScroll,
+    auto* splitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, workScroll,
                                       "startAssignment", Qt::Horizontal);
     layout->addWidget(splitter, 1);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
@@ -305,19 +312,19 @@ QWidget* MainWindow::createStartPage() {
 QWidget* MainWindow::createReportPage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
-    auto* teacher = new QGroupBox(tr("Преподаватель"));
+    auto* teacher = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Преподаватель"));
     auto* teacherForm = new QFormLayout(teacher);
     m_teacherName = new QLineEdit;
-    teacherForm->addRow(tr("Ф. И. О. преподавателя:"), m_teacherName);
-    auto* student = new QGroupBox(tr("Студент"));
+    UiText::row(teacherForm, QT_TRANSLATE_NOOP("App", "Ф. И. О. преподавателя:"), m_teacherName);
+    auto* student = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Студент"));
     auto* studentForm = new QFormLayout(student);
     m_studentName = new QLineEdit;
     m_group = new QLineEdit;
     m_recordBook = new QLineEdit;
-    studentForm->addRow(tr("Ф. И. О. студента:"), m_studentName);
-    studentForm->addRow(tr("Группа:"), m_group);
-    studentForm->addRow(tr("Номер зачётной книжки:"), m_recordBook);
-    auto* create = new QPushButton(tr("Создать отчёт HTML…"));
+    UiText::row(studentForm, QT_TRANSLATE_NOOP("App", "Ф. И. О. студента:"), m_studentName);
+    UiText::row(studentForm, QT_TRANSLATE_NOOP("App", "Группа:"), m_group);
+    UiText::row(studentForm, QT_TRANSLATE_NOOP("App", "Номер зачётной книжки:"), m_recordBook);
+    auto* create = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать отчёт HTML…"));
     create->setObjectName(QStringLiteral("createReportButton"));
     create->setIcon(AppIcons::icon(AppIcons::Kind::Save));
     layout->addWidget(teacher);
@@ -330,19 +337,29 @@ QWidget* MainWindow::createReportPage() {
 
 void MainWindow::createMenus() {
     AppIcons::configureMenuBar(menuBar());
-    auto* file = menuBar()->addMenu(AppIcons::icon(AppIcons::Kind::File), tr("Файл"));
-    auto* newWork = file->addAction(AppIcons::icon(AppIcons::Kind::New),
-                                    tr("Выбрать другой вариант"));
-    auto* open = file->addAction(AppIcons::icon(AppIcons::Kind::Open),
-                                 tr("Открыть работу…"));
-    m_saveAction = file->addAction(AppIcons::icon(AppIcons::Kind::Save),
-                                   tr("Сохранить работу"));
-    m_saveAsAction = file->addAction(AppIcons::icon(AppIcons::Kind::Save),
-                                     tr("Сохранить работу как…"));
+    auto* file = UiText::menu(menuBar(), AppIcons::icon(AppIcons::Kind::File), QT_TRANSLATE_NOOP("App", "Файл"));
+    auto* newWork = UiText::action(file, AppIcons::icon(AppIcons::Kind::New), QT_TRANSLATE_NOOP("App", "Выбрать другой вариант"));
+    auto* open = UiText::action(file, AppIcons::icon(AppIcons::Kind::Open), QT_TRANSLATE_NOOP("App", "Открыть работу…"));
+    m_saveAction = UiText::action(file, AppIcons::icon(AppIcons::Kind::Save), QT_TRANSLATE_NOOP("App", "Сохранить работу"));
+    m_saveAsAction = UiText::action(file, AppIcons::icon(AppIcons::Kind::Save), QT_TRANSLATE_NOOP("App", "Сохранить работу как…"));
     file->addSeparator();
-    auto* quit = file->addAction(AppIcons::icon(AppIcons::Kind::Exit), tr("Выход"));
+    auto* quit = UiText::action(file, AppIcons::icon(AppIcons::Kind::Exit), QT_TRANSLATE_NOOP("App", "Выход"));
     m_saveAction->setEnabled(false);
     m_saveAsAction->setEnabled(false);
+    auto* settings = UiText::menu(menuBar(), AppIcons::icon(AppIcons::Kind::Settings), QT_TRANSLATE_NOOP("App", "Настройки"));
+    settings->setObjectName("settingsMenu");
+    auto* logAction = UiText::action(settings, AppIcons::icon(AppIcons::Kind::Log), QT_TRANSLATE_NOOP("App", "Журнал событий…"));
+    logAction->setObjectName("eventLogAction");
+    connect(logAction, &QAction::triggered, this, &MainWindow::openLog);
+    auto* languages = settings->addMenu(AppIcons::icon(AppIcons::Kind::Language), QString());
+    UiText::bind(languages, "title", QT_TRANSLATE_NOOP("App", "Язык"));
+    auto* group = new QActionGroup(this);
+    m_russianAction = languages->addAction(AppIcons::icon(AppIcons::Kind::Russian), QStringLiteral("Русский"));
+    m_englishAction = languages->addAction(AppIcons::icon(AppIcons::Kind::English), QStringLiteral("English"));
+    m_russianAction->setObjectName("languageRussianAction"); m_englishAction->setObjectName("languageEnglishAction");
+    for (auto* action : {m_russianAction, m_englishAction}) { action->setCheckable(true); group->addAction(action); }
+    connect(m_russianAction, &QAction::triggered, this, [this] { showResult(TranslationManager::instance().setLocale("ru_RU")); });
+    connect(m_englishAction, &QAction::triggered, this, [this] { showResult(TranslationManager::instance().setLocale("en")); });
     connect(newWork, &QAction::triggered, this, &MainWindow::returnToLanding);
     connect(open, &QAction::triggered, this, &MainWindow::openProgress);
     connect(m_saveAction, &QAction::triggered, this, [this] { saveProgress(false); });
@@ -358,15 +375,22 @@ void MainWindow::chooseArchive() {
 
 bool MainWindow::loadArchive(const QString& path, bool showErrors) {
     QList<TrainingVariant> variants;
-    QString error;
-    if (!VariantArchive::load(path, &variants, &error)) {
-        if (showErrors) m_notification->showMessage(error, UiFeedbackLevel::Error);
+    const auto result = VariantArchive::read(path, &variants);
+    if (!result.ok()) {
+        if (showErrors) showResult(result); else Logger::instance().log(result);
         return false;
     }
     if (variants.isEmpty()) {
-        if (showErrors) m_notification->showMessage(tr("В BazaVar нет вариантов."), UiFeedbackLevel::Warning);
+        const auto empty = Result::warning(Message(QT_TRANSLATE_NOOP("Result", "В BazaVar нет вариантов.")), ResultCategory::Archive);
+        if (showErrors) showResult(empty); else Logger::instance().log(empty);
         return false;
     }
+    applyArchive(path, variants);
+    showResult(result);
+    return true;
+}
+
+void MainWindow::applyArchive(const QString& path, const QList<TrainingVariant>& variants) {
     m_archivePath = QFileInfo(path).absoluteFilePath();
     m_variants = variants;
     m_archivePathLabel->setText(QFileInfo(path).fileName());
@@ -387,7 +411,6 @@ bool MainWindow::loadArchive(const QString& path, bool showErrors) {
     m_variantCombo->setEnabled(true);
     m_variantCombo->blockSignals(false);
     updateVariantSelection(m_variantCombo->currentIndex());
-    return true;
 }
 
 void MainWindow::updateVariantSelection(int index) {
@@ -406,11 +429,12 @@ void MainWindow::beginWork() {
     if (!setupWorkspace(m_variants[index])) return;
     m_progressPath.clear();
     m_pages->setCurrentIndex(kWorkspacePage);
+    showResult(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Начата работа с вариантом №%1.")).arg(m_currentVariant.number), ResultCategory::Progress));
 }
 
 bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     if (!variant.available()) {
-        m_landingDirection->setText(tr("Мили → Мура — в разработке. Выберите вариант Мура → Мили."));
+        UiText::bind(m_landingDirection, "text", QT_TRANSLATE_NOOP("App", "Мили → Мура — в разработке. Выберите вариант Мура → Мили."));
         return false;
     }
     m_currentVariant = variant;
@@ -444,14 +468,12 @@ void MainWindow::acceptCounts() {
                          m_outputCount->value() == source.outputs;
     if (!correct) {
         m_countsAccepted = false;
-        setFeedback(
-                    tr("Неверно. Введённые данные не соответствуют варианту."), false);
+        setFeedback(Message(QT_TRANSLATE_NOOP("Result", "Неверно. Введённые данные не соответствуют варианту.")), false);
         updateWorkflowState();
         return;
     }
     m_countsAccepted = true;
-    setFeedback(
-                tr("Верно. Введённые данные соответствуют варианту."), true);
+    setFeedback(Message(QT_TRANSLATE_NOOP("Result", "Верно. Введённые данные соответствуют варианту.")), true);
     updateWorkflowState();
     m_workflowTabs->setCurrentIndex(1);
 }
@@ -471,6 +493,7 @@ void MainWindow::returnToLanding() {
             tr("Несохранённые данные текущей работы будут потеряны. Продолжить?"));
         if (answer != QMessageBox::Yes) return;
     }
+    Logger::instance().log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Возврат к выбору варианта.")), ResultCategory::Progress));
     m_pages->setCurrentIndex(kLandingPage);
     m_hasVariant = false;
     m_saveAction->setEnabled(false);
@@ -508,13 +531,10 @@ void MainWindow::saveProgress(bool saveAs) {
         if (!path.endsWith(QStringLiteral(".m2mwork"), Qt::CaseInsensitive))
             path += QStringLiteral(".m2mwork");
     }
-    QString error;
-    if (!ProgressStore::save(path, progressData(), &error)) {
-        m_notification->showMessage(error, UiFeedbackLevel::Error);
-        return;
-    }
-    m_progressPath = path;
-    m_notification->showMessage(tr("Работа сохранена: %1").arg(QFileInfo(path).fileName()), UiFeedbackLevel::Success);
+    const auto result = ProgressStore::write(path, progressData());
+    showResult(result);
+    if (result.ok()) m_progressPath = path;
+
 }
 
 void MainWindow::openProgress() {
@@ -523,41 +543,40 @@ void MainWindow::openProgress() {
         tr("Работа M2MConvertor (*.m2mwork);;Все файлы (*)"));
     if (path.isEmpty()) return;
     QJsonObject data;
-    QString error;
-    if (!ProgressStore::load(path, &data, &error)) {
-        m_notification->showMessage(error, UiFeedbackLevel::Error);
-        return;
-    }
+    const auto result = ProgressStore::read(path, &data);
+    if (!result.ok()) { showResult(result); return; }
     if (!restoreProgress(data, path)) return;
     m_pages->setCurrentIndex(kWorkspacePage);
+    showResult(result);
 }
 
 bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progressPath) {
     QString archivePath = data.value(QStringLiteral("archivePath")).toString();
     QList<TrainingVariant> variants;
-    QString error;
-    if (!VariantArchive::load(archivePath, &variants, &error)) {
+    auto archiveResult = VariantArchive::read(archivePath, &variants);
+    if (!archiveResult.ok()) {
+        Logger::instance().log(archiveResult);
         archivePath = QFileDialog::getOpenFileName(
             this, tr("Укажите BazaVar для сохранённой работы"), QString(),
             tr("BazaVar M2MTools (*.m2m);;Все файлы (*)"));
         if (archivePath.isEmpty()) return false;
-        if (!VariantArchive::load(archivePath, &variants, &error)) {
-            m_notification->showMessage(error, UiFeedbackLevel::Error);
-            return false;
-        }
+        archiveResult = VariantArchive::read(archivePath, &variants);
+        if (!archiveResult.ok()) { showResult(archiveResult); return false; }
     }
     const int variantNumber = data.value(QStringLiteral("variantNumber")).toInt();
     auto found = std::find_if(variants.cbegin(), variants.cend(),
         [variantNumber](const TrainingVariant& variant) { return variant.number == variantNumber; });
     if (found == variants.cend()) {
-        m_notification->showMessage(tr("В текущем BazaVar нет варианта №%1.").arg(variantNumber), UiFeedbackLevel::Error);
+        showResult(Result::error(Message(QT_TRANSLATE_NOOP("Result", "В текущем BazaVar нет варианта №%1.")).arg(variantNumber), ResultCategory::Progress));
         return false;
     }
     if (!found->available()) {
-        m_notification->showMessage(tr("Открытие работ Мили → Мура пока недоступно."), UiFeedbackLevel::Warning);
+        showResult(Result::warning(Message(QT_TRANSLATE_NOOP("Result", "Открытие работ Мили → Мура пока недоступно.")), ResultCategory::Progress));
         return false;
     }
-    if (!loadArchive(archivePath) || !setupWorkspace(*found)) return false;
+    Logger::instance().log(archiveResult);
+    applyArchive(archivePath, variants);
+    if (!setupWorkspace(*found)) return false;
     m_stateCount->setValue(data.value(QStringLiteral("stateCount")).toInt(1));
     m_inputCount->setValue(data.value(QStringLiteral("inputCount")).toInt(1));
     m_outputCount->setValue(data.value(QStringLiteral("outputCount")).toInt(1));
@@ -582,7 +601,7 @@ void MainWindow::createReport() {
     const QList<QLineEdit*> required = {m_teacherName, m_studentName, m_group, m_recordBook};
     for (QLineEdit* edit : required) {
         if (edit->text().trimmed().isEmpty()) {
-            setFeedback(tr("Заполните все поля отчёта."), false);
+            showResult(Result::error(Message(QT_TRANSLATE_NOOP("Result", "Заполните все поля отчёта.")), ResultCategory::Report));
             edit->setFocus();
             return;
         }
@@ -597,10 +616,10 @@ void MainWindow::createReport() {
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) ||
         file.write(html.toUtf8()) != html.toUtf8().size() || !file.commit()) {
-        setFeedback(tr("Не удалось сохранить отчёт: %1").arg(file.errorString()), false);
+        showResult(Result::error(Message(QT_TRANSLATE_NOOP("Result", "Не удалось сохранить отчёт: %1")).arg(file.errorString()), ResultCategory::Report).withDetails(path));
         return;
     }
-    setFeedback(tr("Отчёт создан: %1").arg(path), true);
+    showResult(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Отчёт создан: %1")).arg(path), ResultCategory::Report));
 }
 
 QString MainWindow::reportHtml() const {
@@ -610,31 +629,71 @@ QString MainWindow::reportHtml() const {
     QImage::fromData(m_currentVariant.diagram).save(&imageBuffer, "PNG");
     const QString image = QString::fromLatin1(pngData.toBase64());
     const QString mime = QStringLiteral("image/png");
-    return QStringLiteral(
-        "<!doctype html><html lang='ru'><meta charset='utf-8'><title>Отчёт M2MConvertor</title>"
-        "<style>body{font:16px sans-serif;max-width:900px;margin:40px auto;color:#172033}"
-        "table{border-collapse:collapse}td,th{border:1px solid #aaa;padding:7px}img{max-width:100%}</style>"
-        "<h1>Преобразование эквивалентных автоматов</h1>"
-        "<p><b>Вариант:</b> №%1<br><b>Направление:</b> %2<br><b>Дата:</b> %3</p>"
-        "<h2>Участники</h2><table><tr><th>Роль</th><th>Ф. И. О.</th></tr>"
-        "<tr><td>Преподаватель</td><td>%4</td></tr>"
-        "<tr><td>Студент</td><td>%5</td></tr></table>"
-        "<p><b>Группа:</b> %6<br><b>Зачётная книжка:</b> %7</p>"
-        "<h2>Результат</h2><p>%8</p><p>%9</p>"
-        "<p><b>Проверка:</b> таблица, матрица и граф обоих автоматов приняты; "
-        "реакция каждого введённого автомата из a0 совпадает с реакцией варианта. "
-        "Проверена заданная последовательность входов; эквивалентность на всех "
-        "возможных последовательностях этой проверкой не устанавливается.</p>"
-        "<h2>Задание</h2><img src='data:%10;base64,%11'></html>")
-        .arg(m_currentVariant.number)
-        .arg(conversionDirectionName(m_currentVariant.direction).toHtmlEscaped())
-        .arg(QDateTime::currentDateTime().toString(Qt::ISODate).toHtmlEscaped())
-        .arg(m_teacherName->text().toHtmlEscaped(), m_studentName->text().toHtmlEscaped(),
-             m_group->text().toHtmlEscaped(), m_recordBook->text().toHtmlEscaped(),
-             automatonSummary(m_sourceEditor->acceptedAutomaton()).toHtmlEscaped(),
-             automatonSummary(m_targetEditor->acceptedAutomaton()).toHtmlEscaped(), mime, image);
+    const auto caption = [](const char* source) { return QCoreApplication::translate("Report", source).toHtmlEscaped(); };
+    const auto pair = [&](const char* label, const QString& value) {
+        return "<p><b>" + caption(label) + "</b> " + value.toHtmlEscaped() + "</p>";
+    };
+    QString html = "<!doctype html><html lang='" + QString(TranslationManager::instance().locale() == "en" ? "en" : "ru") + "'><meta charset='utf-8'><title>" +
+        caption(QT_TRANSLATE_NOOP("Report", "Отчёт M2MConvertor")) + "</title>" +
+        "<style>body{font:16px sans-serif;max-width:900px;margin:40px auto}img{max-width:100%}</style><h1>" +
+        caption(QT_TRANSLATE_NOOP("Report", "Преобразование эквивалентных автоматов")) + "</h1>";
+    html += pair(QT_TRANSLATE_NOOP("Report", "Вариант:"), QString::number(m_currentVariant.number));
+    html += pair(QT_TRANSLATE_NOOP("Report", "Направление:"), conversionDirectionName(m_currentVariant.direction));
+    html += pair(QT_TRANSLATE_NOOP("Report", "Дата:"), QDateTime::currentDateTime().toString(Qt::ISODate));
+    html += "<h2>" + caption(QT_TRANSLATE_NOOP("Report", "Участники")) + "</h2>";
+    html += pair(QT_TRANSLATE_NOOP("Report", "Преподаватель:"), m_teacherName->text());
+    html += pair(QT_TRANSLATE_NOOP("Report", "Студент:"), m_studentName->text());
+    html += pair(QT_TRANSLATE_NOOP("Report", "Группа:"), m_group->text());
+    html += pair(QT_TRANSLATE_NOOP("Report", "Зачётная книжка:"), m_recordBook->text());
+    html += "<h2>" + caption(QT_TRANSLATE_NOOP("Report", "Результат")) + "</h2><p>" +
+        automatonSummary(m_sourceEditor->acceptedAutomaton()).toHtmlEscaped() + "</p><p>" +
+        automatonSummary(m_targetEditor->acceptedAutomaton()).toHtmlEscaped() + "</p><p>" +
+        caption(QT_TRANSLATE_NOOP("Report", "Таблица, матрица и граф обоих автоматов приняты. Реакция каждого автомата из a0 совпадает с реакцией варианта. Проверена заданная последовательность входов; эквивалентность на всех возможных последовательностях этой проверкой не устанавливается.")) + "</p>";
+    html += "<h2>" + caption(QT_TRANSLATE_NOOP("Report", "Задание")) + "</h2><img src='data:" + mime + ";base64," + image + "'></html>";
+    return html;
 }
 
-void MainWindow::setFeedback(const QString& text, bool success) {
-    m_notification->showMessage(text, success ? UiFeedbackLevel::Success : UiFeedbackLevel::Error);
+void MainWindow::setFeedback(const Message& text, bool success) {
+    showResult(success ? Result::success(text, ResultCategory::Validation) : Result::error(text, ResultCategory::Validation));
+}
+
+void MainWindow::showResult(const Result& result) {
+    if (result.message().isEmpty()) return;
+    Logger::instance().log(result);
+    displayResult(result);
+}
+void MainWindow::displayResult(const Result& result) {
+    m_lastResult = result;
+    m_notification->showMessage(result.text(), result.level() == ResultLevel::Error ? UiFeedbackLevel::Error :
+        result.level() == ResultLevel::Warning ? UiFeedbackLevel::Warning : UiFeedbackLevel::Success);
+}
+void MainWindow::openLog() {
+    if (!m_logWindow) {
+        m_logWindow = new LogWindow(this);
+        connect(m_logWindow, &LogWindow::notification, this, &MainWindow::displayResult);
+    }
+    m_logWindow->show(); m_logWindow->raise(); m_logWindow->activateWindow();
+}
+void MainWindow::changeEvent(QEvent* event) {
+    QMainWindow::changeEvent(event);
+    if (m_ready && event->type() == QEvent::LanguageChange) refreshTexts();
+}
+void MainWindow::refreshTexts() {
+    if (!m_ready) return;
+    UiText::refresh(this);
+    m_russianAction->setChecked(TranslationManager::instance().locale() == "ru_RU");
+    m_englishAction->setChecked(TranslationManager::instance().locale() == "en");
+    const QSignalBlocker blocker(m_variantCombo);
+    for (int index = 0; index < m_variants.size(); ++index)
+        m_variantCombo->setItemText(index, m_variants[index].available()
+            ? tr("Вариант №%1").arg(m_variants[index].number)
+            : tr("Вариант №%1 — Мили → Мура (в разработке)").arg(m_variants[index].number));
+    updateVariantSelection(m_variantCombo->currentIndex());
+    if (!m_archivePath.isEmpty()) m_archivePathLabel->setText(QFileInfo(m_archivePath).fileName());
+    if (m_hasVariant) {
+        m_variantTitle->setText(tr("Вариант №%1 — %2").arg(m_currentVariant.number).arg(conversionDirectionName(m_currentVariant.direction)));
+        m_directionLabel->setText(conversionDirectionName(m_currentVariant.direction));
+    }
+    m_sourceEditor->retranslateTexts(); m_targetEditor->retranslateTexts();
+    if (m_lastResult) m_notification->updateMessageText(m_lastResult->text());
 }

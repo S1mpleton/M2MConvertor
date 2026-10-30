@@ -1,3 +1,4 @@
+#include "ui/uitext.h"
 #include "ui/widgets/hintsplitter.h"
 #include <QGroupBox>
 #include <QKeyEvent>
@@ -11,8 +12,8 @@ class HintHandle : public QSplitterHandle {
     HintHandle(Qt::Orientation orientation, HintSplitter* splitter)
         : QSplitterHandle(orientation, splitter), m_owner(splitter) {
         setFocusPolicy(Qt::StrongFocus);
-        setAccessibleName(tr("Размер подсказки"));
-        setToolTip(tr("Потяните границу, чтобы изменить размер подсказки. "
+        UiText::bind(this, "accessibleName", QT_TRANSLATE_NOOP("App", "Размер подсказки"));
+        UiText::bind(this, "toolTip", QT_TRANSLATE_NOOP("App", "Потяните границу, чтобы изменить размер подсказки. "
                       "Продолжите движение за упор, чтобы скрыть её. "
                       "Потяните обратно или дважды щёлкните, чтобы раскрыть."));
     }
@@ -49,14 +50,14 @@ class HintHandle : public QSplitterHandle {
     HintSplitter* m_owner;
 };
 } // namespace
-HintSplitter::HintSplitter(const QString& title, QWidget* hint, QWidget* work, const QString& name,
+HintSplitter::HintSplitter(const char* title, QWidget* hint, QWidget* work, const QString& name,
                            Qt::Orientation orientation, QWidget* parent)
     : QSplitter(orientation, parent) {
     setObjectName(name);
     setContentsMargins(0, 0, 0, 0);
     setHandleWidth(8);
     setChildrenCollapsible(false);
-    auto* group = new QGroupBox(title);
+    auto* group = UiText::make<QGroupBox>(title);
     group->setObjectName(name + "Content");
     auto* layout = new QVBoxLayout(group);
     layout->setContentsMargins(8, 8, 8, 8);

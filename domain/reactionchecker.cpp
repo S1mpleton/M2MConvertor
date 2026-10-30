@@ -12,19 +12,18 @@ QStringList ReactionChecker::stateNames(int count) {
 ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Automaton& candidate,
                                            bool graph) {
     if (!task.available())
-        return {false, QStringLiteral("Преобразование Мили → Мура находится в разработке.")};
-    QString error;
-    if (!candidate.validate(&error))
-        return {false, error};
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "Преобразование Мили → Мура находится в разработке."))};
+    const auto valid = candidate.validation();
+    if (!valid.ok()) return {false, valid.message()};
     const auto& counts = task.counts(candidate.kind);
     if (candidate.states != stateNames(graph ? candidate.states.size() : counts.states) ||
         (graph && candidate.states.size() > 10) || candidate.initialState != 0)
-        return {false, QStringLiteral("Нужны состояния a0…a%1; начальное состояние — a0.")
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "Нужны состояния a0…a%1; начальное состояние — a0."))
                            .arg(counts.states - 1)};
     if (candidate.inputs.size() != counts.inputs || candidate.outputs.size() != counts.outputs)
-        return {false, QStringLiteral("Автомат %1: требуется %2 входных и %3 выходных сигналов; "
-                                      "введено %4 и %5.")
-                           .arg(automatonKindName(candidate.kind))
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "Автомат %1: требуется %2 входных и %3 выходных сигналов; "
+                                      "введено %4 и %5."))
+                           .arg(candidate.kind == AutomatonKind::Mealy ? Message(QT_TRANSLATE_NOOP("Result", "Мили")) : Message(QT_TRANSLATE_NOOP("Result", "Мура")))
                            .arg(counts.inputs)
                            .arg(counts.outputs)
                            .arg(candidate.inputs.size())
@@ -33,12 +32,12 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
     const QRegularExpression outputPattern(QStringLiteral("^y[0-9]$"));
     for (const auto& input : candidate.inputs)
         if (!inputPattern.match(input).hasMatch())
-            return {false, QStringLiteral("Входной сигнал должен иметь вид x0…x9.")};
+            return {false, Message(QT_TRANSLATE_NOOP("Result", "Входной сигнал должен иметь вид x0…x9."))};
     for (const auto& output : candidate.outputs)
         if (!outputPattern.match(output).hasMatch())
-            return {false, QStringLiteral("Выходной сигнал должен иметь вид y0…y9.")};
+            return {false, Message(QT_TRANSLATE_NOOP("Result", "Выходной сигнал должен иметь вид y0…y9."))};
     if (task.reaction.isEmpty())
-        return {false, QStringLiteral("В варианте отсутствует реакция для проверки.")};
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "В варианте отсутствует реакция для проверки."))};
 
     // Build an index once: checking a long ordered trace is O(transitions + steps).
     QHash<quint64, const Transition*> edges;
@@ -53,11 +52,11 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
         const int input = candidate.inputs.indexOf(expected.input);
         if (input < 0)
             return {false,
-                    QStringLiteral("Такт %1: не задан вход %2.").arg(i + 1).arg(expected.input), i};
+                    Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(i + 1).arg(expected.input), i};
         const auto* edge = edges.value(key(state, input), nullptr);
         if (!edge && candidate.kind == AutomatonKind::Mealy)
             return {false,
-                    QStringLiteral("Такт %1: из %2 не задан переход по %3.")
+                    Message(QT_TRANSLATE_NOOP("Result", "Такт %1: из %2 не задан переход по %3."))
                         .arg(i + 1)
                         .arg(candidate.states[state], expected.input),
                     i};
@@ -72,7 +71,7 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
             QStringList observed(actual.begin(), actual.end());
             observed.sort();
             return {false,
-                    QStringLiteral("Такт %1, %2 из %3: ожидались выходы %4, получены %5.")
+                    Message(QT_TRANSLATE_NOOP("Result", "Такт %1, %2 из %3: ожидались выходы %4, получены %5."))
                         .arg(i + 1)
                         .arg(expected.input, candidate.states[state],
                              expected.outputs.isEmpty() ? QStringLiteral("—")
@@ -83,13 +82,13 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
         if (i + 1 < task.reaction.size()) {
             if (!edge)
                 return {false,
-                        QStringLiteral("Такт %1: из %2 нет перехода по %3 для продолжения реакции.")
+                        Message(QT_TRANSLATE_NOOP("Result", "Такт %1: из %2 нет перехода по %3 для продолжения реакции."))
                             .arg(i + 1)
                             .arg(candidate.states[state], expected.input),
                         i};
             state = edge->to;
         }
     }
-    return {true, QStringLiteral("Верно. Реакция из a0 совпадает с вариантом во всех %1 тактах.")
+    return {true, Message(QT_TRANSLATE_NOOP("Result", "Верно. Реакция из a0 совпадает с вариантом во всех %1 тактах."))
                       .arg(task.reaction.size())};
 }

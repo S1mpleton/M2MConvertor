@@ -163,19 +163,17 @@ IsomorphismResult IsomorphismChecker::compare(const Automaton& expected,
                                               const Automaton& actual) {
     QString error;
     if (!actual.validate(&error))
-        return {false, QStringLiteral("Введённый автомат некорректен: %1").arg(error)};
+        return {false, QCoreApplication::translate("Legacy", "Введённый автомат некорректен: %1").arg(error)};
     if (expected.kind != actual.kind)
-        return {false, QStringLiteral("Выбран неверный тип автомата.")};
+        return {false, QCoreApplication::translate("Legacy", "Выбран неверный тип автомата.")};
     if (expected.states.size() != actual.states.size() ||
         expected.inputs.size() != actual.inputs.size() ||
         expected.outputs.size() != actual.outputs.size() ||
         expected.transitions.size() != actual.transitions.size()) {
-        return {false, QStringLiteral("Не совпадает число состояний, сигналов или переходов.")};
+        return {false, QCoreApplication::translate("Legacy", "Не совпадает число состояний, сигналов или переходов.")};
     }
     if (!isomorphic(makeGraph(expected), makeGraph(actual))) {
-        return {false, QStringLiteral(
-            "Нагруженные графы не изоморфны: проверьте начальное состояние, переходы и выходы.")};
+        return {false, QCoreApplication::translate("Legacy", "Нагруженные графы не изоморфны: проверьте начальное состояние, переходы и выходы.")};
     }
-    return {true, QStringLiteral(
-        "Верно. Автоматы изоморфны с точностью до переименования состояний и сигналов.")};
+    return {true, QCoreApplication::translate("Legacy", "Верно. Автоматы изоморфны с точностью до переименования состояний и сигналов.")};
 }

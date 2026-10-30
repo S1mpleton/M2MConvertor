@@ -87,7 +87,7 @@ bool ConversionService::mealyToMoore(const Automaton& source,
             const int destination = pairIndexes.value(
                 pairKey(sourceEdge->to, sourceEdge->outputs), -1);
             if (destination < 0) {
-                if (error) *error = QStringLiteral("Не удалось построить состояние автомата Мура.");
+                if (error) *error = QCoreApplication::translate("Legacy", "Не удалось построить состояние автомата Мура.");
                 return false;
             }
             result.transitions.append({pairIndex, input, destination, {}});

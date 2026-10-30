@@ -5,6 +5,7 @@
 
 #include <QJsonObject>
 #include <QMainWindow>
+#include <optional>
 
 class AutomatonEditor;
 class QAction;
@@ -18,6 +19,8 @@ class QSpinBox;
 class QStackedWidget;
 class QTabWidget;
 class QShowEvent;
+class QEvent;
+class LogWindow;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -26,6 +29,7 @@ public:
 
 protected:
     void showEvent(QShowEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
 private:
     friend struct MainWindowTestAccess;
@@ -34,6 +38,11 @@ private:
     QWidget* createStartPage();
     QWidget* createReportPage();
     void createMenus();
+    void refreshTexts();
+    void showResult(const Result& result);
+    void displayResult(const Result& result);
+    void openLog();
+    void applyArchive(const QString& path, const QList<TrainingVariant>& variants);
     void chooseArchive();
     bool loadArchive(const QString& path, bool showErrors = true);
     void updateVariantSelection(int index);
@@ -46,7 +55,7 @@ private:
     bool restoreProgress(const QJsonObject& data, const QString& progressPath);
     QJsonObject progressData() const;
     void createReport();
-    void setFeedback(const QString& text, bool success);
+    void setFeedback(const Message& text, bool success);
     QString reportHtml() const;
     void updateWorkflowState();
 
@@ -72,6 +81,11 @@ private:
     QLineEdit* m_recordBook;
 
     FeedbackLabel* m_notification;
+    LogWindow* m_logWindow = nullptr;
+    QAction* m_russianAction;
+    QAction* m_englishAction;
+    std::optional<Result> m_lastResult;
+    bool m_ready = false;
     QAction* m_saveAction;
     QAction* m_saveAsAction;
     QList<TrainingVariant> m_variants;

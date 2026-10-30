@@ -1,3 +1,12 @@
+#include "infrastructure/translationmanager.h"
+#include "infrastructure/logger.h"
+#include "ui/logwindow.h"
+#include <QAction>
+#include <QMenu>
+#include <QCheckBox>
+#include <QPlainTextEdit>
+#include <QClipboard>
+#include <QSettings>
 #include "mainwindow.h"
 #include "ui/automatongrapheditor.h"
 #include "ui/automatoneditor.h"
@@ -229,6 +238,41 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(g->fromJson(gd, &error), "Mealy graph restores");
     target->findChild<QPushButton*>("acceptGraphButton")->click();
     require(target->completed() && workflow->isTabEnabled(3), "six accepted representations unlock report");
+    const auto acceptedSource = source->acceptedAutomaton().toJson();
+    const auto acceptedTarget = target->acceptedAutomaton().toJson();
+    const auto hintState = source->toJson().value("hintExtents");
+    auto* settingsMenu = window.findChild<QMenu*>("settingsMenu");
+    auto* english = window.findChild<QAction*>("languageEnglishAction");
+    auto* russian = window.findChild<QAction*>("languageRussianAction");
+    require(settingsMenu && english && russian, "Settings exposes language actions");
+    window.findChild<QAction*>("eventLogAction")->trigger(); QApplication::processEvents();
+    auto* log = window.findChild<LogWindow*>("eventLogWindow");
+    require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
+    english->trigger(); QApplication::processEvents();
+    if (!screenshot.isEmpty()) {
+        window.grab().save(screenshot + ".english.png");
+        log->grab().save(screenshot + ".log-english.png");
+    }
+    require(settingsMenu->title() == "Settings" && workflow->tabText(1) == "Moore automaton" &&
+        source->findChild<QTabWidget*>()->tabText(0) == "Table" && table->item(0, 0)->text() == "Input signals",
+        "live translation covers menus, workflow tabs and generated headers");
+    require(source->completed() && target->completed() && acceptedSource == source->acceptedAutomaton().toJson() &&
+        acceptedTarget == target->acceptedAutomaton().toJson() && hintState == source->toJson().value("hintExtents"),
+        "language switch preserves answers, acceptance and divider sizes");
+    require(table->item(4, 0)->text() == "x9" && table->item(3, 1)->text() == "a0", "user symbols and state names are never translated");
+    auto* logText = log->findChild<QPlainTextEdit*>("logTextEdit");
+    require(log->windowTitle() == "Application Log" && logText->toPlainText().contains("reaction from a0") &&
+        logText->toPlainText().contains("Moore — Table") && !logText->toPlainText().contains("Верно."),
+        "event history including formatted validation messages is retranslated");
+    require(MainWindowTestAccess::html(window).contains("<html lang='en'>"), "HTML report follows selected language");
+    require(QSettings().value("language").toString() == "en", "language preference is saved");
+    require(!TranslationManager::instance().setLocale("fr", false).ok() && settingsMenu->title() == "Settings", "unsupported locale leaves active translation intact");
+    russian->trigger(); QApplication::processEvents();
+    require(settingsMenu->title() == "Настройки" && log->windowTitle() == "Журнал событий", "Russian can be restored live");
+    for (auto* button : log->findChildren<QAbstractButton*>())
+        require(button->width() >= button->minimumSizeHint().width(), "translated log controls retain enough space for their captions");
+    if (!screenshot.isEmpty()) log->grab().save(screenshot + ".log-russian.png");
+    log->hide(); window.activateWindow();
     require(workflow->widget(3)->findChildren<QLineEdit*>().size() == 4,
         "report has only names, group and record book");
     workflow->setCurrentIndex(3);
@@ -276,6 +320,36 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     table->item(1, 1)->setText("y5");
     source->findChild<QPushButton*>("acceptTableButton")->click();
     require(!source->toJson().value("tableAccepted").toBool() && !workflow->isTabEnabled(2), "wrong output invalidates downstream work");
+}
+
+void testJournal() {
+    auto& logger = Logger::instance(); logger.clear();
+    const auto error = Result::error(Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(4, QString("x9")), ResultCategory::Validation);
+    logger.log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Приложение запущено."))));
+    logger.log(Result::warning(Message(QT_TRANSLATE_NOOP("Result", "В BazaVar нет вариантов.")), ResultCategory::Archive));
+    logger.log(error);
+    LogWindow journal; journal.show(); QApplication::processEvents();
+    auto* text = journal.findChild<QPlainTextEdit*>("logTextEdit");
+    require(logger.history().size() == 3 && text->toPlainText().contains("Такт 4") && text->toPlainText().contains("x9"), "journal displays retained history with arguments");
+    journal.findChild<QCheckBox*>("showInfoBox")->setChecked(false);
+    require(!text->toPlainText().contains("Приложение запущено") && text->toPlainText().contains("Такт 4"), "severity filter hides only matching events");
+    journal.findChild<QPushButton*>("copyButton")->click();
+    require(QApplication::clipboard()->text() == text->toPlainText(), "copy without selection copies the filtered log");
+    auto cursor = text->textCursor(); cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::NextWord, QTextCursor::KeepAnchor);
+    text->setTextCursor(cursor);
+    const auto selected = cursor.selectedText();
+    journal.findChild<QPushButton*>("copyButton")->click();
+    require(QApplication::clipboard()->text() == selected, "copy respects selected log text");
+    QTemporaryDir directory; const auto path = directory.filePath("журнал.txt");
+    require(journal.saveTo(path).ok(), "log saves atomically as UTF-8");
+    QFile file(path); require(file.open(QIODevice::ReadOnly) && QString::fromUtf8(file.readAll()) == text->toPlainText(), "saved log matches the visible filtered entries");
+    require(!journal.saveTo(directory.filePath("missing/log.txt")).ok(), "failed log save returns an error");
+    TranslationManager::instance().setLocale("en", false); QApplication::processEvents();
+    require(error.text().contains("Step 4") && text->toPlainText().contains("Step 4") && text->toPlainText().contains("x9"), "stored Result translates its template before substituting arguments");
+    journal.findChild<QPushButton*>("clearButton")->click();
+    require(logger.history().isEmpty() && text->toPlainText().isEmpty(), "clear empties history and all views");
+    TranslationManager::instance().setLocale("ru_RU", false);
 }
 
 void testHintDrag() {
@@ -342,6 +416,11 @@ void testValidationAndFeedback() {
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    QTemporaryDir settings;
+    QCoreApplication::setOrganizationName("M2MTests"); QCoreApplication::setApplicationName("M2MConvertorTests");
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settings.path());
+    require(TranslationManager::instance().setLocale("ru_RU", false).ok(), "Russian translation resource loads");
     QPalette dark = app.palette();
     dark.setColor(QPalette::Window, QColor(32, 34, 37));
     dark.setColor(QPalette::WindowText, Qt::white);
@@ -501,6 +580,7 @@ int main(int argc, char** argv) {
                 "interactive graph screenshot is saved");
     }
     testReactionWorkflow(window, argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
+    testJournal();
     testHintDrag();
     testImages();
     testValidationAndFeedback();
