@@ -88,6 +88,7 @@ private:
     QLineEdit* m_matrixDimension;
     QWidget* m_matrixContent;
     QPushButton* m_clearMatrixButton;
+    QPushButton* m_acceptMatrixButton;
     QLabel* m_outputCaption;
     QTableWidget* m_matrixOutputs;
     QTableWidget* m_matrixTable;

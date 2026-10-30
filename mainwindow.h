@@ -80,6 +80,7 @@ private:
     QLabel* m_directionLabel;
     TaskImage* m_diagramLabel;
     WorkScrollArea* m_landingScroll;
+    QWidget* m_landingFooter;
     WorkScrollArea* m_startWorkScroll;
     HintSplitter* m_startSplitter;
     QSpinBox* m_stateCount;

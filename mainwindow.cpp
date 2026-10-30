@@ -18,6 +18,7 @@
 #include <QShowEvent>
 #include <QTimer>
 #include "ui/widgets/workscrollarea.h"
+#include "ui/widgets/actionbar.h"
 #include "ui/workflowtabs.h"
 #include "ui/appicons.h"
 
@@ -131,7 +132,8 @@ void MainWindow::applyInitialSize() {
     const auto* landingLayout = m_landingScroll->widget()->layout();
     const int landingHeight = qMax(landingLayout->minimumSize().height(),
         landingLayout->minimumHeightForWidth(m_landingScroll->viewport()->width()));
-    const int height = qMax(landingHeight + menuBar()->height(), workHeight);
+    const int footerHeight = m_landingFooter->heightForWidth(targetWidth);
+    const int height = qMax(landingHeight + menuBar()->height() + footerHeight, workHeight);
     resize(targetWidth, qMin(height, limit.height()));
     if (isVisible()) {
         const QPoint decoration = pos() - frameGeometry().topLeft();
@@ -142,7 +144,7 @@ void MainWindow::applyInitialSize() {
 QWidget* MainWindow::createLandingPage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
-    outer->setContentsMargins(36, 28, 36, 32);
+    outer->setContentsMargins(36, 28, 36, 12);
     outer->setSpacing(18);
     auto* title = new WrappingLabel;
     UiText::bind(title, "text", QT_TRANSLATE_NOOP("App", "Преобразование конечных автоматов Мили и Мура"));
@@ -182,7 +184,6 @@ QWidget* MainWindow::createLandingPage() {
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     archiveLayout->addWidget(m_archivePathLabel);
-    archiveLayout->addWidget(archiveButton, 0, Qt::AlignLeft);
     archiveLayout->addStretch();
 
     auto* variantGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "2. Вариант работы"));
@@ -215,7 +216,8 @@ QWidget* MainWindow::createLandingPage() {
     UiText::bind(actionHint, "text", QT_TRANSLATE_NOOP("App", "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
     actionHint->setWordWrap(true);
     outer->addWidget(actionHint);
-    auto* actions = new QHBoxLayout;
+    auto* actions = new ActionBar(Qt::AlignHCenter);
+    actions->setObjectName("landingActions");
     m_beginButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
     m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
     m_beginButton->setEnabled(false);
@@ -224,18 +226,26 @@ QWidget* MainWindow::createLandingPage() {
     auto* openProgressButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
     openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
     openProgressButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
-    actions->addStretch();
+    actions->addWidget(archiveButton);
     actions->addWidget(m_beginButton);
     actions->addWidget(openProgressButton);
-    actions->addStretch();
-    outer->addLayout(actions);
     connect(archiveButton, &QPushButton::clicked, this, &MainWindow::chooseArchive);
     connect(m_variantCombo, &QComboBox::currentIndexChanged,
             this, &MainWindow::updateVariantSelection);
     connect(m_beginButton, &QPushButton::clicked, this, &MainWindow::beginWork);
     connect(openProgressButton, &QPushButton::clicked, this, &MainWindow::openProgress);
     m_landingScroll = new WorkScrollArea(page);
-    return m_landingScroll;
+    m_landingFooter = new QWidget;
+    auto* footer = new QVBoxLayout(m_landingFooter);
+    footer->setContentsMargins(20, 8, 20, 16);
+    footer->addWidget(actions);
+    auto* container = new QWidget;
+    auto* containerLayout = new QVBoxLayout(container);
+    containerLayout->setContentsMargins(0, 0, 0, 0);
+    containerLayout->setSpacing(0);
+    containerLayout->addWidget(m_landingScroll, 1);
+    containerLayout->addWidget(m_landingFooter);
+    return container;
 }
 
 QWidget* MainWindow::createWorkspacePage() {
@@ -324,7 +334,6 @@ QWidget* MainWindow::createStartPage() {
     accept->setObjectName(QStringLiteral("acceptCountsButton"));
     accept->setDefault(true);
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    countLayout->addRow(accept);
     right->addWidget(counts);
     right->addStretch();
     m_startWorkScroll = new WorkScrollArea(workPanel);
@@ -332,6 +341,9 @@ QWidget* MainWindow::createStartPage() {
     m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, m_startWorkScroll,
                                       "startAssignment", Qt::Horizontal);
     layout->addWidget(m_startSplitter, 1);
+    auto* actions = new ActionBar;
+    actions->addWidget(accept);
+    layout->addWidget(actions);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
     auto invalidate = [this] {
         if (!m_countsAccepted) return;
@@ -366,10 +378,16 @@ QWidget* MainWindow::createReportPage() {
     create->setIcon(AppIcons::icon(AppIcons::Kind::Save));
     layout->addWidget(teacher);
     layout->addWidget(student);
-    layout->addWidget(create, 0, Qt::AlignCenter);
     layout->addStretch();
     connect(create, &QPushButton::clicked, this, &MainWindow::createReport);
-    return new WorkScrollArea(page);
+    auto* container = new QWidget;
+    auto* containerLayout = new QVBoxLayout(container);
+    containerLayout->setContentsMargins(10, 10, 10, 10);
+    containerLayout->addWidget(new WorkScrollArea(page), 1);
+    auto* actions = new ActionBar;
+    actions->addWidget(create);
+    containerLayout->addWidget(actions);
+    return container;
 }
 
 void MainWindow::createMenus() {

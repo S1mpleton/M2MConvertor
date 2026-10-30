@@ -109,6 +109,21 @@ QString hoverHelp(QTableWidget* table, int row, int col) {
     return text;
 }
 
+void requireVisibleAction(QWidget* window, QPushButton* button) {
+    require(button && button->isVisible(), "working button remains visible");
+    if (!button->visibleRegion().boundingRect().contains(button->rect()))
+        qWarning() << "clipped action" << button->objectName() << window->size() << button->geometry()
+                   << button->visibleRegion().boundingRect() << button->parentWidget()->size();
+    require(button->visibleRegion().boundingRect().contains(button->rect()), "working button is not clipped by a viewport");
+    require(button->width() >= button->minimumSizeHint().width() && button->height() >= button->sizeHint().height(),
+        "working button retains its full caption and height");
+    for (auto* parent = button->parentWidget(); parent; parent = parent->parentWidget()) {
+        require(parent->rect().contains(QRect(button->mapTo(parent, QPoint()), button->size())),
+            "working button fits every containing widget");
+        if (parent == window) break;
+    }
+}
+
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     window.activateWindow(); window.raise(); QApplication::processEvents();
     QTemporaryDir temporary;
@@ -253,7 +268,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* divider = source->findChild<HintSplitter*>("graphHint");
 
     require(divider && !source->findChild<QToolButton*>("graphHintToggle"), "hint uses a splitter without a toggle button");
-    auto* workArea = qobject_cast<WorkScrollArea*>(divider->widget(1));
+    auto* workArea = divider->widget(1)->findChild<WorkScrollArea*>();
     require(workArea && workArea->verticalScrollBar()->maximum() == 0 &&
         workArea->horizontalScrollBar()->maximum() == 0,
         "instructions and acceptance remain visible without outer scrolling in a regular window");
@@ -372,20 +387,36 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(!html.contains("Идентификатор") && !html.contains("%11") &&
         html.contains("Преподаватель &lt;&amp;&gt;") && html.contains("data:image/png;base64,"),
         "HTML report omits identifiers and keeps escaped names and embedded image");
-    workflow->setCurrentIndex(1);
-    auto* representation = source->findChild<QTabWidget*>();
-    for (const auto& size : {QSize(1100, 820), window.minimumSizeHint(), QSize(640, 480), QSize(900, 650)}) {
+    for (const auto& size : {QSize(1100, 820), window.minimumSizeHint(), QSize(640, 480), QSize(480, 360), QSize(900, 650)}) {
         window.resize(size); QApplication::processEvents();
-        for (int tab = 0; tab < 3; ++tab) {
-            representation->setCurrentIndex(tab); QApplication::processEvents();
-            auto* active = representation->currentWidget();
-            require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
-            for (auto* label : active->findChildren<QLabel*>()) {
-                if (label->objectName() == "graphInstructions")
-                    require(label->height() >= label->heightForWidth(label->width()) - 1, "wrapped instructions keep enough height");
+        for (int editor = 0; editor < 2; ++editor) {
+            workflow->setCurrentIndex(editor + 1);
+            auto* representation = (editor == 0 ? source : target)->findChild<QTabWidget*>();
+            for (int tab = 0; tab < 3; ++tab) {
+                representation->setCurrentIndex(tab); QApplication::processEvents(); QApplication::processEvents();
+                auto* active = representation->currentWidget();
+                require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
+                const QStringList names = tab == 0 ? QStringList{"acceptTableButton"} : tab == 1 ?
+                    QStringList{"clearMatrixButton", "configureMatrixButton", "acceptMatrixButton"} :
+                    QStringList{"createVertexButton", "deleteVertexButton", "acceptGraphButton"};
+                for (const auto& name : names) requireVisibleAction(&window, active->findChild<QPushButton*>(name));
+                if (auto* scroll = active->findChild<WorkScrollArea*>()) {
+                    scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->maximum());
+                    QApplication::processEvents();
+                    for (const auto& name : names) requireVisibleAction(&window, active->findChild<QPushButton*>(name));
+                }
+                for (auto* label : active->findChildren<QLabel*>()) {
+                    if (label->objectName() == "graphInstructions")
+                        require(label->height() >= label->heightForWidth(label->width()) - 1, "wrapped instructions keep enough height");
+                }
             }
         }
+        workflow->setCurrentIndex(0); QApplication::processEvents();
+        requireVisibleAction(&window, window.findChild<QPushButton*>("acceptCountsButton"));
+        workflow->setCurrentIndex(3); QApplication::processEvents();
+        requireVisibleAction(&window, window.findChild<QPushButton*>("createReportButton"));
     }
+    workflow->setCurrentIndex(1); source->findChild<QTabWidget*>()->setCurrentIndex(2); QApplication::processEvents();
     if (!screenshot.isEmpty()) window.grab().save(screenshot + ".small-graph.png");
     MainWindow restored;
     require(MainWindowTestAccess::restore(restored, MainWindowTestAccess::progress(window)), "progress reloads");
@@ -698,6 +729,16 @@ int main(int argc, char** argv) {
     require(openArchive->styleSheet().isEmpty() && begin->styleSheet().isEmpty(),
             "buttons keep the operating-system style");
     require(!begin->isEnabled(), "work cannot start before BazaVar and variant selection");
+    const auto startupSize = window.size();
+    for (const auto locale : {"ru_RU", "en"}) {
+        TranslationManager::instance().setLocale(locale, false);
+        for (const auto& size : {QSize(900, 500), QSize(480, 360), QSize(350, 300)}) {
+            window.resize(size); QApplication::processEvents(); QApplication::processEvents();
+            for (auto* button : {openArchive, begin, openProgress}) requireVisibleAction(&window, button);
+        }
+    }
+    TranslationManager::instance().setLocale("ru_RU", false);
+    window.resize(startupSize); QApplication::processEvents(); QApplication::processEvents();
     auto* landingTitle = window.findChild<QLabel*>(QStringLiteral("landingTitle"));
     require(landingTitle && landingTitle->palette().color(QPalette::WindowText) == Qt::white,
             "labels inherit a dark operating-system palette");

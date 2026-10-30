@@ -9,6 +9,7 @@
 #include "ui/widgets/hintsplitter.h"
 #include "ui/plaincelldelegate.h"
 #include "ui/widgets/workscrollarea.h"
+#include "ui/widgets/actionbar.h"
 #include <QSignalBlocker>
 #include "ui/appicons.h"
 #include "ui/workflowtabs.h"
@@ -111,7 +112,7 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(10, 10, 10, 10);
-    outer->setSpacing(0);
+    outer->setSpacing(8);
     auto* work = new QWidget;
     auto* layout = new QVBoxLayout(work);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -133,11 +134,13 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять таблицу"));
     accept->setObjectName(QStringLiteral("acceptTableButton"));
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    layout->addWidget(accept, 0, Qt::AlignRight);
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptTable);
     connect(m_transitionTable, &QTableWidget::itemChanged, this, [this] { invalidateFromTable(); });
     m_assignmentPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_assignmentImage, scrollWork(work), "tableAssignment");
-    outer->addWidget(m_assignmentPanel);
+    outer->addWidget(m_assignmentPanel, 1);
+    auto* actions = new ActionBar;
+    actions->addWidget(accept);
+    outer->addWidget(actions);
     return page;
 }
 
@@ -145,20 +148,22 @@ QWidget* AutomatonEditor::createMatrixPage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(10, 10, 10, 10);
-    outer->setSpacing(0);
+    outer->setSpacing(8);
     auto* work = new QWidget;
     auto* layout = new QVBoxLayout(work);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(8);
     m_matrixReference = new QTableWidget;
     m_matrixReference->setObjectName("matrixReference");
-    auto* row = new QHBoxLayout;
+    auto* row = new ActionBar(Qt::AlignJustify);
     m_clearMatrixButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить матрицу"));
     m_clearMatrixButton->setObjectName("clearMatrixButton");
     m_clearMatrixButton->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
     m_clearMatrixButton->setEnabled(false);
     row->addWidget(m_clearMatrixButton);
-    row->addStretch();
+    auto* dimensions = new QWidget;
+    auto* dimensionLayout = new QHBoxLayout(dimensions);
+    dimensionLayout->setContentsMargins(0, 0, 0, 0);
     m_matrixDimension = new QLineEdit;
     m_matrixDimension->setObjectName("matrixDimensionEdit");
     m_matrixDimension->setMaximumWidth(fontMetrics().horizontalAdvance("000000") + 28);
@@ -166,10 +171,11 @@ QWidget* AutomatonEditor::createMatrixPage() {
     auto* create = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
     create->setObjectName("configureMatrixButton");
     create->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    row->addWidget(UiText::make<QLabel>(QT_TRANSLATE_NOOP("App", "Размерность:")));
-    row->addWidget(m_matrixDimension);
-    row->addWidget(create);
-    layout->addLayout(row);
+    dimensionLayout->addWidget(UiText::make<QLabel>(QT_TRANSLATE_NOOP("App", "Размерность:")));
+    dimensionLayout->addWidget(m_matrixDimension);
+    dimensionLayout->addWidget(create);
+    row->addWidget(dimensions);
+    layout->addWidget(row);
     m_matrixContent = new QWidget;
     auto* contentLayout = new QVBoxLayout(m_matrixContent);
     contentLayout->setContentsMargins(0, 0, 0, 0);
@@ -203,11 +209,16 @@ QWidget* AutomatonEditor::createMatrixPage() {
     hint->setWordWrap(true);
     contentLayout->addWidget(hint);
     auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять матрицу"));
+    m_acceptMatrixButton = accept;
+    accept->setEnabled(false);
     accept->setObjectName("acceptMatrixButton");
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    contentLayout->addWidget(accept, 0, Qt::AlignRight);
-    layout->addWidget(m_matrixContent, 1);
-    layout->addStretch();
+    auto* body = new QWidget;
+    auto* bodyLayout = new QVBoxLayout(body);
+    bodyLayout->setContentsMargins(0, 0, 0, 0);
+    bodyLayout->addWidget(m_matrixContent, 1);
+    bodyLayout->addStretch();
+    layout->addWidget(scrollWork(body), 1);
     m_matrixContent->hide();
     connect(m_clearMatrixButton, &QPushButton::clicked, this, &AutomatonEditor::clearMatrix);
     connect(create, &QPushButton::clicked, this, &AutomatonEditor::configureMatrix);
@@ -215,8 +226,11 @@ QWidget* AutomatonEditor::createMatrixPage() {
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptMatrix);
     connect(m_matrixTable, &QTableWidget::itemChanged, this, [this] { invalidateFromMatrix(); });
     connect(m_matrixOutputs, &QTableWidget::itemChanged, this, [this] { invalidateFromMatrix(); });
-    m_matrixPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Принятая таблица автомата"), m_matrixReference, scrollWork(work), "matrixHint");
-    outer->addWidget(m_matrixPanel);
+    m_matrixPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Принятая таблица автомата"), m_matrixReference, work, "matrixHint");
+    outer->addWidget(m_matrixPanel, 1);
+    auto* actions = new ActionBar;
+    actions->addWidget(accept);
+    outer->addWidget(actions);
     return page;
 }
 
@@ -224,14 +238,14 @@ QWidget* AutomatonEditor::createGraphPage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(10, 10, 10, 10);
-    outer->setSpacing(0);
+    outer->setSpacing(8);
     auto* work = new QWidget;
     auto* layout = new QVBoxLayout(work);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(8);
     m_graphReference = new QTableWidget;
     m_graphReference->setObjectName("graphReference");
-    auto* buttons = new QHBoxLayout;
+    auto* buttons = new ActionBar(Qt::AlignLeft);
     auto* add = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать вершину"));
     add->setObjectName(QStringLiteral("createVertexButton"));
     auto* remove = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Удалить последнюю вершину"));
@@ -240,8 +254,11 @@ QWidget* AutomatonEditor::createGraphPage() {
     remove->setIcon(AppIcons::icon(AppIcons::Kind::Remove));
     buttons->addWidget(add);
     buttons->addWidget(remove);
-    buttons->addStretch();
-    layout->addLayout(buttons);
+    layout->addWidget(buttons);
+    auto* body = new QWidget;
+    auto* bodyLayout = new QVBoxLayout(body);
+    bodyLayout->setContentsMargins(0, 0, 0, 0);
+    bodyLayout->setSpacing(8);
     m_graphEditor = new AutomatonGraphEditor;
     m_graphEditor->setObjectName(QStringLiteral("interactiveGraphEditor"));
     m_graphEditor->setMinimumHeight(120);
@@ -251,18 +268,18 @@ QWidget* AutomatonEditor::createGraphPage() {
         add->setEnabled(count < 10);
         remove->setEnabled(count > 0);
     });
-    layout->addWidget(m_graphEditor, 1);
+    bodyLayout->addWidget(m_graphEditor, 1);
     auto* hint = new WrappingLabel;
     hint->setObjectName("graphInstructions");
     UiText::bind(hint, "text", QT_TRANSLATE_NOOP("App", "Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Выберите исходную вершину, "
         "затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. "
         "Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно)."));
     hint->setWordWrap(true);
-    layout->addWidget(hint);
+    bodyLayout->addWidget(hint);
+    layout->addWidget(scrollWork(body), 1);
     auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять граф"));
     accept->setObjectName("acceptGraphButton");
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    layout->addWidget(accept, 0, Qt::AlignRight);
     connect(add, &QPushButton::clicked, m_graphEditor,
             &AutomatonGraphEditor::createVertex);
     connect(remove, &QPushButton::clicked, m_graphEditor,
@@ -270,8 +287,11 @@ QWidget* AutomatonEditor::createGraphPage() {
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptGraph);
     connect(m_graphEditor, &AutomatonGraphEditor::graphChanged,
             this, &AutomatonEditor::invalidateGraph);
-    m_graphPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Принятая таблица автомата"), m_graphReference, scrollWork(work), "graphHint");
-    outer->addWidget(m_graphPanel);
+    m_graphPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Принятая таблица автомата"), m_graphReference, work, "graphHint");
+    outer->addWidget(m_graphPanel, 1);
+    auto* actions = new ActionBar;
+    actions->addWidget(accept);
+    outer->addWidget(actions);
     return page;
 }
 
@@ -536,6 +556,7 @@ void AutomatonEditor::resetMatrix() {
     m_matrixOutputs->setRowCount(0);
     m_matrixContent->hide();
     m_clearMatrixButton->setEnabled(false);
+    m_acceptMatrixButton->setEnabled(false);
     invalidateFromMatrix();
 }
 
@@ -558,6 +579,7 @@ void AutomatonEditor::buildMatrix(int size) {
     ensureItems(m_matrixTable);
     m_matrixContent->show();
     m_clearMatrixButton->setEnabled(true);
+    m_acceptMatrixButton->setEnabled(true);
     m_loading = loading;
     invalidateFromMatrix();
 }
