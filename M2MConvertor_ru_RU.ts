@@ -4,253 +4,254 @@
 <context>
     <name>App</name>
     <message>
-        <location filename="mainwindow.cpp" line="65"/>
+        <location filename="mainwindow.cpp" line="67"/>
         <source>M2MConvertor — эквивалентные автоматы</source>
         <translation>M2MConvertor — эквивалентные автоматы</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="112"/>
+        <location filename="mainwindow.cpp" line="146"/>
         <source>Преобразование конечных автоматов Мили и Мура</source>
         <translation>Преобразование конечных автоматов Мили и Мура</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="120"/>
+        <location filename="mainwindow.cpp" line="154"/>
         <source>Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. Направление преобразования определяется самим вариантом.</source>
         <translation>Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. Направление преобразования определяется самим вариантом.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="133"/>
+        <location filename="mainwindow.cpp" line="166"/>
         <source>1. База вариантов</source>
         <translation>1. База вариантов</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="138"/>
+        <location filename="mainwindow.cpp" line="171"/>
         <source>Выберите файл .m2m с реакциями, экспортированный из M2MTools. Приложение проверит целостность архива перед показом вариантов.</source>
         <translation>Выберите файл .m2m с реакциями, экспортированный из M2MTools. Приложение проверит целостность архива перед показом вариантов.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="143"/>
+        <location filename="mainwindow.cpp" line="176"/>
         <source>BazaVar не выбран</source>
         <translation>BazaVar не выбран</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="146"/>
+        <location filename="mainwindow.cpp" line="179"/>
         <source>Открыть BazaVar…</source>
         <translation>Открыть BazaVar…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="153"/>
+        <location filename="mainwindow.cpp" line="186"/>
         <source>2. Вариант работы</source>
         <translation>2. Вариант работы</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="158"/>
+        <location filename="mainwindow.cpp" line="191"/>
         <source>Выберите номер варианта. Направление преобразования уже задано в базе и будет выбрано автоматически.</source>
         <translation>Выберите номер варианта. Направление преобразования уже задано в базе и будет выбрано автоматически.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="168"/>
+        <location filename="mainwindow.cpp" line="201"/>
         <source>—</source>
         <translation>—</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="170"/>
+        <location filename="mainwindow.cpp" line="203"/>
         <source>Вариант:</source>
         <translation>Вариант:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="171"/>
+        <location filename="mainwindow.cpp" line="204"/>
         <source>Преобразование:</source>
         <translation>Преобразование:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="180"/>
+        <location filename="mainwindow.cpp" line="213"/>
         <source>Создайте новую работу для выбранного варианта или продолжите ранее сохранённую.</source>
         <translation>Создайте новую работу для выбранного варианта или продолжите ранее сохранённую.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="185"/>
+        <location filename="mainwindow.cpp" line="217"/>
         <source>Создать работу</source>
         <translation>Создать работу</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="190"/>
+        <location filename="mainwindow.cpp" line="222"/>
         <source>Открыть сохранённую работу…</source>
         <translation>Открыть сохранённую работу…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="211"/>
+        <location filename="mainwindow.cpp" line="244"/>
         <source>К выбору варианта</source>
         <translation>К выбору варианта</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="224"/>
+        <location filename="mainwindow.cpp" line="257"/>
         <source>Начало работы</source>
         <translation>Начало работы</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="229"/>
+        <location filename="mainwindow.cpp" line="262"/>
         <source>Автомат Мура</source>
         <translation>Автомат Мура</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="230"/>
+        <location filename="mainwindow.cpp" line="263"/>
         <source>Автомат Мили</source>
         <translation>Автомат Мили</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="231"/>
+        <location filename="mainwindow.cpp" line="264"/>
         <source>Отчёт</source>
         <translation>Отчёт</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="266"/>
+        <location filename="mainwindow.cpp" line="299"/>
         <source>Порядок работы</source>
         <translation>Порядок работы</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="269"/>
+        <location filename="mainwindow.cpp" line="302"/>
         <source>Изучите задание на рисунке и укажите размер исходного автомата. После правильного ответа откроется последовательная работа с таблицей, матрицей и графом.</source>
         <translation>Изучите задание на рисунке и укажите размер исходного автомата. После правильного ответа откроется последовательная работа с таблицей, матрицей и графом.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="274"/>
+        <location filename="mainwindow.cpp" line="307"/>
         <source>Проверьте структуру исходного автомата</source>
         <translation>Проверьте структуру исходного автомата</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="284"/>
+        <location filename="mainwindow.cpp" line="318"/>
         <source>Количество состояний:</source>
         <translation>Количество состояний:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="285"/>
+        <location filename="mainwindow.cpp" line="319"/>
         <source>Количество входных сигналов:</source>
         <translation>Количество входных сигналов:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="286"/>
+        <location filename="mainwindow.cpp" line="320"/>
         <source>Количество выходных сигналов:</source>
         <translation>Количество выходных сигналов:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="287"/>
+        <location filename="mainwindow.cpp" line="321"/>
+        <location filename="ui/automatoneditor.cpp" line="114"/>
         <source>Принять</source>
         <translation>Принять</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="295"/>
-        <location filename="ui/automatoneditor.cpp" line="86"/>
+        <location filename="mainwindow.cpp" line="330"/>
+        <location filename="ui/automatoneditor.cpp" line="87"/>
         <source>Задание варианта</source>
         <translation>Задание варианта</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="315"/>
+        <location filename="mainwindow.cpp" line="350"/>
         <source>Преподаватель</source>
         <translation>Преподаватель</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="318"/>
+        <location filename="mainwindow.cpp" line="353"/>
         <source>Ф. И. О. преподавателя:</source>
         <translation>Ф. И. О. преподавателя:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="319"/>
+        <location filename="mainwindow.cpp" line="354"/>
         <source>Студент</source>
         <translation>Студент</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="324"/>
+        <location filename="mainwindow.cpp" line="359"/>
         <source>Ф. И. О. студента:</source>
         <translation>Ф. И. О. студента:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="325"/>
+        <location filename="mainwindow.cpp" line="360"/>
         <source>Группа:</source>
         <translation>Группа:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="326"/>
+        <location filename="mainwindow.cpp" line="361"/>
         <source>Номер зачётной книжки:</source>
         <translation>Номер зачётной книжки:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="327"/>
+        <location filename="mainwindow.cpp" line="362"/>
         <source>Создать отчёт HTML…</source>
         <translation>Создать отчёт HTML…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="340"/>
+        <location filename="mainwindow.cpp" line="375"/>
         <source>Файл</source>
         <translation>Файл</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="341"/>
+        <location filename="mainwindow.cpp" line="376"/>
         <source>Выбрать другой вариант</source>
         <translation>Выбрать другой вариант</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="342"/>
+        <location filename="mainwindow.cpp" line="377"/>
         <source>Открыть работу…</source>
         <translation>Открыть работу…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="343"/>
+        <location filename="mainwindow.cpp" line="378"/>
         <source>Сохранить работу</source>
         <translation>Сохранить работу</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="344"/>
+        <location filename="mainwindow.cpp" line="379"/>
         <source>Сохранить работу как…</source>
         <translation>Сохранить работу как…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="346"/>
+        <location filename="mainwindow.cpp" line="381"/>
         <source>Выход</source>
         <translation>Выход</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="349"/>
+        <location filename="mainwindow.cpp" line="384"/>
         <source>Настройки</source>
         <translation>Настройки</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="351"/>
+        <location filename="mainwindow.cpp" line="386"/>
         <source>Журнал событий…</source>
         <translation>Журнал событий…</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="355"/>
+        <location filename="mainwindow.cpp" line="390"/>
         <source>Язык</source>
         <translation>Язык</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="437"/>
+        <location filename="mainwindow.cpp" line="472"/>
         <source>Мили → Мура — в разработке. Выберите вариант Мура → Мили.</source>
         <translation>Мили → Мура — в разработке. Выберите вариант Мура → Мили.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="49"/>
+        <location filename="ui/automatoneditor.cpp" line="50"/>
         <source>Таблица</source>
         <translation>Таблица</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="50"/>
+        <location filename="ui/automatoneditor.cpp" line="51"/>
         <source>Матрица</source>
         <translation>Матрица</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="51"/>
+        <location filename="ui/automatoneditor.cpp" line="52"/>
         <source>Граф</source>
         <translation>Граф</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="76"/>
+        <location filename="ui/automatoneditor.cpp" line="77"/>
         <source>Мили: ячейка «следующее состояние / выход1, выход2». Мура: выходы над состояниями. Введите входы x0…x9 слева; «-» означает отсутствие перехода или выхода.</source>
         <translation>Мили: ячейка «следующее состояние / выход1, выход2». Мура: выходы над состояниями. Введите входы x0…x9 слева; «-» означает отсутствие перехода или выхода.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="80"/>
+        <location filename="ui/automatoneditor.cpp" line="81"/>
         <source>Принять таблицу</source>
         <translation>Принять таблицу</translation>
     </message>
@@ -260,71 +261,76 @@
         <translation>Очистить матрицу</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="107"/>
+        <location filename="ui/automatoneditor.cpp" line="113"/>
+        <source>Размерность матрицы</source>
+        <translation>Размерность матрицы</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="117"/>
         <source>Размерность:</source>
         <translation>Размерность:</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="124"/>
-        <location filename="ui/automatoneditor.cpp" line="830"/>
+        <location filename="ui/automatoneditor.cpp" line="137"/>
+        <location filename="ui/automatoneditor.cpp" line="886"/>
         <source>Состояние</source>
         <translation>Состояние</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="124"/>
-        <location filename="ui/automatoneditor.cpp" line="272"/>
-        <location filename="ui/automatoneditor.cpp" line="826"/>
-        <location filename="ui/automatoneditor.cpp" line="830"/>
+        <location filename="ui/automatoneditor.cpp" line="137"/>
+        <location filename="ui/automatoneditor.cpp" line="283"/>
+        <location filename="ui/automatoneditor.cpp" line="882"/>
+        <location filename="ui/automatoneditor.cpp" line="886"/>
         <source>Выходные сигналы</source>
         <translation>Выходные сигналы</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="136"/>
+        <location filename="ui/automatoneditor.cpp" line="149"/>
         <source>В каждой ячейке укажите метки дуг через «;». Для Мили: «вход / выход1,выход2»; для Мура: «x1, x2». Строка — откуда, столбец — куда. Выходы Мура заполните в таблице справа.</source>
         <translation>В каждой ячейке укажите метки дуг через «;». Для Мили: «вход / выход1,выход2»; для Мура: «x1, x2». Строка — откуда, столбец — куда. Выходы Мура заполните в таблице справа.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="140"/>
+        <location filename="ui/automatoneditor.cpp" line="153"/>
         <source>Принять матрицу</source>
         <translation>Принять матрицу</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="148"/>
-        <location filename="ui/automatoneditor.cpp" line="205"/>
+        <location filename="ui/automatoneditor.cpp" line="166"/>
+        <location filename="ui/automatoneditor.cpp" line="221"/>
         <source>Принятая таблица автомата</source>
         <translation>Принятая таблица автомата</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="165"/>
+        <location filename="ui/automatoneditor.cpp" line="183"/>
         <source>Создать вершину</source>
         <translation>Создать вершину</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="167"/>
+        <location filename="ui/automatoneditor.cpp" line="185"/>
         <source>Удалить последнюю вершину</source>
         <translation>Удалить последнюю вершину</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="187"/>
-        <source>Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Можно создать до 10 состояний a0…a9. Выберите исходную вершину, затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. Вершины можно перемещать, а дугу — перетаскивать для изменения изгиба. Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно). Для Мили вершина подписывается «a0», дуга — «x1 / y1» или «x2 / -». Для Мура вершина — «a0 / y1», дуга — «x1».</source>
-        <translation>Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Можно создать до 10 состояний a0…a9. Выберите исходную вершину, затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. Вершины можно перемещать, а дугу — перетаскивать для изменения изгиба. Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно). Для Мили вершина подписывается «a0», дуга — «x1 / y1» или «x2 / -». Для Мура вершина — «a0 / y1», дуга — «x1».</translation>
+        <location filename="ui/automatoneditor.cpp" line="205"/>
+        <source>Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Выберите исходную вершину, затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно).</source>
+        <translation>Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Выберите исходную вершину, затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно).</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="194"/>
+        <location filename="ui/automatoneditor.cpp" line="210"/>
         <source>Принять граф</source>
         <translation>Принять граф</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="269"/>
-        <location filename="ui/automatoneditor.cpp" line="282"/>
-        <location filename="ui/automatoneditor.cpp" line="824"/>
-        <location filename="ui/automatoneditor.cpp" line="828"/>
+        <location filename="ui/automatoneditor.cpp" line="280"/>
+        <location filename="ui/automatoneditor.cpp" line="293"/>
+        <location filename="ui/automatoneditor.cpp" line="880"/>
+        <location filename="ui/automatoneditor.cpp" line="884"/>
         <source>Входные сигналы</source>
         <translation>Входные сигналы</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="276"/>
-        <location filename="ui/automatoneditor.cpp" line="827"/>
+        <location filename="ui/automatoneditor.cpp" line="287"/>
+        <location filename="ui/automatoneditor.cpp" line="883"/>
         <source>Состояния</source>
         <translation>Состояния</translation>
     </message>
@@ -347,14 +353,6 @@
         <location filename="ui/widgets/hintsplitter.cpp" line="16"/>
         <source>Потяните границу, чтобы изменить размер подсказки. Продолжите движение за упор, чтобы скрыть её. Потяните обратно или дважды щёлкните, чтобы раскрыть.</source>
         <translation>Потяните границу, чтобы изменить размер подсказки. Продолжите движение за упор, чтобы скрыть её. Потяните обратно или дважды щёлкните, чтобы раскрыть.</translation>
-    </message>
-</context>
-<context>
-    <name>AutomatonEditor</name>
-    <message>
-        <location filename="ui/automatoneditor.cpp" line="216"/>
-        <source>%1 × %1</source>
-        <translation>%1 × %1</translation>
     </message>
 </context>
 <context>
@@ -532,96 +530,96 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="mainwindow.cpp" line="372"/>
+        <location filename="mainwindow.cpp" line="407"/>
         <source>Открыть BazaVar</source>
         <translation>Открыть BazaVar</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="372"/>
-        <location filename="mainwindow.cpp" line="561"/>
+        <location filename="mainwindow.cpp" line="407"/>
+        <location filename="mainwindow.cpp" line="617"/>
         <source>BazaVar M2MTools (*.m2m);;Все файлы (*)</source>
         <translation>BazaVar M2MTools (*.m2m);;Все файлы (*)</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="403"/>
-        <location filename="mainwindow.cpp" line="689"/>
+        <location filename="mainwindow.cpp" line="438"/>
+        <location filename="mainwindow.cpp" line="745"/>
         <source>Вариант №%1</source>
         <translation>Вариант №%1</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="404"/>
-        <location filename="mainwindow.cpp" line="690"/>
+        <location filename="mainwindow.cpp" line="439"/>
+        <location filename="mainwindow.cpp" line="746"/>
         <source>Вариант №%1 — Мили → Мура (в разработке)</source>
         <translation>Вариант №%1 — Мили → Мура (в разработке)</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="421"/>
+        <location filename="mainwindow.cpp" line="456"/>
         <source>Мили → Мура — в разработке</source>
         <translation>Мили → Мура — в разработке</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="423"/>
+        <location filename="mainwindow.cpp" line="458"/>
         <source>В базе нет доступных вариантов Мура → Мили.</source>
         <translation>В базе нет доступных вариантов Мура → Мили.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="443"/>
-        <location filename="mainwindow.cpp" line="694"/>
+        <location filename="mainwindow.cpp" line="478"/>
+        <location filename="mainwindow.cpp" line="750"/>
         <source>Вариант №%1 — %2</source>
         <translation>Вариант №%1 — %2</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="492"/>
+        <location filename="mainwindow.cpp" line="548"/>
         <source>Завершить текущую работу?</source>
         <translation>Завершить текущую работу?</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="493"/>
+        <location filename="mainwindow.cpp" line="549"/>
         <source>Несохранённые данные текущей работы будут потеряны. Продолжить?</source>
         <translation>Несохранённые данные текущей работы будут потеряны. Продолжить?</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="527"/>
+        <location filename="mainwindow.cpp" line="583"/>
         <source>Сохранить учебную работу</source>
         <translation>Сохранить учебную работу</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="528"/>
+        <location filename="mainwindow.cpp" line="584"/>
         <source>variant-%1.m2mwork</source>
         <translation>variant-%1.m2mwork</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="529"/>
+        <location filename="mainwindow.cpp" line="585"/>
         <source>Работа M2MConvertor (*.m2mwork)</source>
         <translation>Работа M2MConvertor (*.m2mwork)</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="542"/>
+        <location filename="mainwindow.cpp" line="598"/>
         <source>Открыть учебную работу</source>
         <translation>Открыть учебную работу</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="543"/>
+        <location filename="mainwindow.cpp" line="599"/>
         <source>Работа M2MConvertor (*.m2mwork);;Все файлы (*)</source>
         <translation>Работа M2MConvertor (*.m2mwork);;Все файлы (*)</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="560"/>
+        <location filename="mainwindow.cpp" line="616"/>
         <source>Укажите BazaVar для сохранённой работы</source>
         <translation>Укажите BazaVar для сохранённой работы</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="610"/>
+        <location filename="mainwindow.cpp" line="666"/>
         <source>Сохранить отчёт</source>
         <translation>Сохранить отчёт</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="611"/>
+        <location filename="mainwindow.cpp" line="667"/>
         <source>report-variant-%1.html</source>
         <translation>report-variant-%1.html</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="612"/>
+        <location filename="mainwindow.cpp" line="668"/>
         <source>Отчёт HTML (*.html)</source>
         <translation>Отчёт HTML (*.html)</translation>
     </message>
@@ -642,72 +640,72 @@
 <context>
     <name>Report</name>
     <message>
-        <location filename="mainwindow.cpp" line="57"/>
+        <location filename="mainwindow.cpp" line="59"/>
         <source>%1: %2 состояний, %3 входов, %4 выходов, %5 переходов</source>
         <translation>%1: %2 состояний, %3 входов, %4 выходов, %5 переходов</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="637"/>
+        <location filename="mainwindow.cpp" line="693"/>
         <source>Отчёт M2MConvertor</source>
         <translation>Отчёт M2MConvertor</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="639"/>
+        <location filename="mainwindow.cpp" line="695"/>
         <source>Преобразование эквивалентных автоматов</source>
         <translation>Преобразование эквивалентных автоматов</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="640"/>
+        <location filename="mainwindow.cpp" line="696"/>
         <source>Вариант:</source>
         <translation>Вариант:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="641"/>
+        <location filename="mainwindow.cpp" line="697"/>
         <source>Направление:</source>
         <translation>Направление:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="642"/>
+        <location filename="mainwindow.cpp" line="698"/>
         <source>Дата:</source>
         <translation>Дата:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="643"/>
+        <location filename="mainwindow.cpp" line="699"/>
         <source>Участники</source>
         <translation>Участники</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="644"/>
+        <location filename="mainwindow.cpp" line="700"/>
         <source>Преподаватель:</source>
         <translation>Преподаватель:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="645"/>
+        <location filename="mainwindow.cpp" line="701"/>
         <source>Студент:</source>
         <translation>Студент:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="646"/>
+        <location filename="mainwindow.cpp" line="702"/>
         <source>Группа:</source>
         <translation>Группа:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="647"/>
+        <location filename="mainwindow.cpp" line="703"/>
         <source>Зачётная книжка:</source>
         <translation>Зачётная книжка:</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="648"/>
+        <location filename="mainwindow.cpp" line="704"/>
         <source>Результат</source>
         <translation>Результат</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="651"/>
+        <location filename="mainwindow.cpp" line="707"/>
         <source>Таблица, матрица и граф обоих автоматов приняты. Реакция каждого автомата из a0 совпадает с реакцией варианта. Проверена заданная последовательность входов; эквивалентность на всех возможных последовательностях этой проверкой не устанавливается.</source>
         <translation>Таблица, матрица и граф обоих автоматов приняты. Реакция каждого автомата из a0 совпадает с реакцией варианта. Проверена заданная последовательность входов; эквивалентность на всех возможных последовательностях этой проверкой не устанавливается.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="652"/>
+        <location filename="mainwindow.cpp" line="708"/>
         <source>Задание</source>
         <translation>Задание</translation>
     </message>
@@ -715,73 +713,73 @@
 <context>
     <name>Result</name>
     <message>
-        <location filename="mainwindow.cpp" line="91"/>
-        <location filename="tests/gui_smoke.cpp" line="326"/>
+        <location filename="mainwindow.cpp" line="93"/>
+        <location filename="tests/gui_smoke.cpp" line="373"/>
         <source>Приложение запущено.</source>
         <translation>Приложение запущено.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="384"/>
-        <location filename="tests/gui_smoke.cpp" line="327"/>
+        <location filename="mainwindow.cpp" line="419"/>
+        <location filename="tests/gui_smoke.cpp" line="374"/>
         <source>В BazaVar нет вариантов.</source>
         <translation>В BazaVar нет вариантов.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="432"/>
+        <location filename="mainwindow.cpp" line="467"/>
         <source>Начата работа с вариантом №%1.</source>
         <translation>Начата работа с вариантом №%1.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="471"/>
+        <location filename="mainwindow.cpp" line="527"/>
         <source>Неверно. Введённые данные не соответствуют варианту.</source>
         <translation>Неверно. Введённые данные не соответствуют варианту.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="476"/>
+        <location filename="mainwindow.cpp" line="532"/>
         <source>Верно. Введённые данные соответствуют варианту.</source>
         <translation>Верно. Введённые данные соответствуют варианту.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="496"/>
+        <location filename="mainwindow.cpp" line="552"/>
         <source>Возврат к выбору варианта.</source>
         <translation>Возврат к выбору варианта.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="570"/>
+        <location filename="mainwindow.cpp" line="626"/>
         <source>В текущем BazaVar нет варианта №%1.</source>
         <translation>В текущем BazaVar нет варианта №%1.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="574"/>
+        <location filename="mainwindow.cpp" line="630"/>
         <source>Открытие работ Мили → Мура пока недоступно.</source>
         <translation>Открытие работ Мили → Мура пока недоступно.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="604"/>
+        <location filename="mainwindow.cpp" line="660"/>
         <source>Заполните все поля отчёта.</source>
         <translation>Заполните все поля отчёта.</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="619"/>
+        <location filename="mainwindow.cpp" line="675"/>
         <source>Не удалось сохранить отчёт: %1</source>
         <translation>Не удалось сохранить отчёт: %1</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="622"/>
+        <location filename="mainwindow.cpp" line="678"/>
         <source>Отчёт создан: %1</source>
         <translation>Отчёт создан: %1</translation>
     </message>
     <message>
         <location filename="domain/automaton.cpp" line="55"/>
         <location filename="domain/reactionchecker.cpp" line="26"/>
-        <location filename="ui/automatoneditor.cpp" line="704"/>
+        <location filename="ui/automatoneditor.cpp" line="750"/>
         <source>Мили</source>
         <translation>Мили</translation>
     </message>
     <message>
         <location filename="domain/automaton.cpp" line="56"/>
         <location filename="domain/reactionchecker.cpp" line="26"/>
-        <location filename="ui/automatoneditor.cpp" line="704"/>
+        <location filename="ui/automatoneditor.cpp" line="750"/>
         <source>Мура</source>
         <translation>Мура</translation>
     </message>
@@ -887,7 +885,7 @@
     </message>
     <message>
         <location filename="domain/reactionchecker.cpp" line="55"/>
-        <location filename="tests/gui_smoke.cpp" line="325"/>
+        <location filename="tests/gui_smoke.cpp" line="372"/>
         <source>Такт %1: не задан вход %2.</source>
         <translation>Такт %1: не задан вход %2.</translation>
     </message>
@@ -1100,142 +1098,152 @@
         <translation>Не удалось прочитать архив.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="318"/>
+        <location filename="ui/automatoneditor.cpp" line="329"/>
         <source>Заполните входные сигналы слева: разные x0…x9.</source>
         <translation>Заполните входные сигналы слева: разные x0…x9.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="330"/>
+        <location filename="ui/automatoneditor.cpp" line="341"/>
         <source>Выходы состояний: введите y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Выходы состояний: введите y0…y9 через запятую, без повторов, либо «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="344"/>
+        <location filename="ui/automatoneditor.cpp" line="355"/>
         <source>Для перехода Мили укажите «состояние / выход». </source>
         <translation>Для перехода Мили укажите «состояние / выход». </translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="351"/>
+        <location filename="ui/automatoneditor.cpp" line="362"/>
         <source>Без следующего состояния выходы не задаются. Для отсутствия перехода используйте -/-.</source>
         <translation>Без следующего состояния выходы не задаются. Для отсутствия перехода используйте -/-.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="357"/>
+        <location filename="ui/automatoneditor.cpp" line="368"/>
         <source>Переход ссылается на неизвестное состояние «%1».</source>
         <translation>Переход ссылается на неизвестное состояние «%1».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="365"/>
+        <location filename="ui/automatoneditor.cpp" line="376"/>
         <source>Выходы перехода: введите y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Выходы перехода: введите y0…y9 через запятую, без повторов, либо «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="449"/>
+        <location filename="ui/automatoneditor.cpp" line="462"/>
+        <source>Введите размерность матрицы одним положительным целым числом.</source>
+        <translation>Введите размерность матрицы одним положительным целым числом.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="467"/>
+        <source>Размерность матрицы должна совпадать с числом состояний принятой таблицы: %1.</source>
+        <translation>Размерность матрицы должна совпадать с числом состояний принятой таблицы: %1.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="472"/>
         <source>Матрица слишком велика для редактора (более 250 000 ячеек).</source>
         <translation>Матрица слишком велика для редактора (более 250 000 ячеек).</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="479"/>
+        <location filename="ui/automatoneditor.cpp" line="525"/>
         <source>Сначала создайте матрицу правильной размерности.</source>
         <translation>Сначала создайте матрицу правильной размерности.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="488"/>
+        <location filename="ui/automatoneditor.cpp" line="534"/>
         <source>Выходы состояния %1: нужны y0…y9 через запятую или «-».</source>
         <translation>Выходы состояния %1: нужны y0…y9 через запятую или «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="506"/>
+        <location filename="ui/automatoneditor.cpp" line="552"/>
         <source>Метка дуги Мили должна иметь вид «вход / выход».</source>
         <translation>Метка дуги Мили должна иметь вид «вход / выход».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="514"/>
+        <location filename="ui/automatoneditor.cpp" line="560"/>
         <source>Матрица содержит неизвестный вход «%1».</source>
         <translation>Матрица содержит неизвестный вход «%1».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="519"/>
+        <location filename="ui/automatoneditor.cpp" line="565"/>
         <source>Для одной пары состояние-вход задано несколько дуг.</source>
         <translation>Для одной пары состояние-вход задано несколько дуг.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="528"/>
+        <location filename="ui/automatoneditor.cpp" line="574"/>
         <source>Выходы в матрице: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Выходы в матрице: нужны y0…y9 через запятую, без повторов, либо «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="582"/>
+        <location filename="ui/automatoneditor.cpp" line="628"/>
         <source>Вершина автомата Мура должна иметь подпись «состояние / выходы».</source>
         <translation>Вершина автомата Мура должна иметь подпись «состояние / выходы».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="590"/>
+        <location filename="ui/automatoneditor.cpp" line="636"/>
         <source>Вершина содержит неизвестное состояние «%1».</source>
         <translation>Вершина содержит неизвестное состояние «%1».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="594"/>
+        <location filename="ui/automatoneditor.cpp" line="640"/>
         <source>Состояние «%1» представлено несколькими вершинами.</source>
         <translation>Состояние «%1» представлено несколькими вершинами.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="603"/>
+        <location filename="ui/automatoneditor.cpp" line="649"/>
         <source>Выходы вершины «%1»: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Выходы вершины «%1»: нужны y0…y9 через запятую, без повторов, либо «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="609"/>
+        <location filename="ui/automatoneditor.cpp" line="655"/>
         <source>На графе представлены не все состояния автомата.</source>
         <translation>На графе представлены не все состояния автомата.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="616"/>
+        <location filename="ui/automatoneditor.cpp" line="662"/>
         <source>Дуга ссылается на неизвестную вершину.</source>
         <translation>Дуга ссылается на неизвестную вершину.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="622"/>
+        <location filename="ui/automatoneditor.cpp" line="668"/>
         <source>У каждой дуги должна быть подпись.</source>
         <translation>У каждой дуги должна быть подпись.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="631"/>
+        <location filename="ui/automatoneditor.cpp" line="677"/>
         <source>Дуга Мили должна иметь подпись «вход / выходы».</source>
         <translation>Дуга Мили должна иметь подпись «вход / выходы».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="637"/>
+        <location filename="ui/automatoneditor.cpp" line="683"/>
         <source>На дуге автомата Мура указывается только вход.</source>
         <translation>На дуге автомата Мура указывается только вход.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="642"/>
+        <location filename="ui/automatoneditor.cpp" line="688"/>
         <source>Дуга содержит неизвестный вход «%1».</source>
         <translation>Дуга содержит неизвестный вход «%1».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="651"/>
+        <location filename="ui/automatoneditor.cpp" line="697"/>
         <source>Выходы дуги: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Выходы дуги: нужны y0…y9 через запятую, без повторов, либо «-».</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="705"/>
+        <location filename="ui/automatoneditor.cpp" line="751"/>
         <source>Таблица</source>
         <translation>Таблица</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="705"/>
+        <location filename="ui/automatoneditor.cpp" line="751"/>
         <source>Матрица</source>
         <translation>Матрица</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="705"/>
+        <location filename="ui/automatoneditor.cpp" line="751"/>
         <source>Граф</source>
         <translation>Граф</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="706"/>
+        <location filename="ui/automatoneditor.cpp" line="752"/>
         <source>%1 — %2</source>
         <translation>%1 — %2</translation>
     </message>

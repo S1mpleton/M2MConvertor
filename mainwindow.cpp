@@ -38,12 +38,14 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QScreen>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QStyle>
 #include <QTabWidget>
+#include <QTabBar>
 #include <QTextStream>
 #include <QVBoxLayout>
 
@@ -89,18 +91,50 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_ready = true;
     refreshTexts();
     Logger::instance().log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Приложение запущено."))));
-    layout()->activate();
-    resize(minimumSizeHint().expandedTo(QSize(0, 0)));
+    applyInitialSize();
 }
 
 void MainWindow::showEvent(QShowEvent* event) {
     QMainWindow::showEvent(event);
     if (m_initialSizeApplied) return;
     m_initialSizeApplied = true;
-    QTimer::singleShot(0, this, [this] {
-        layout()->activate();
-        resize(minimumSizeHint().expandedTo(QSize(0, 0)));
-    });
+    QTimer::singleShot(0, this, &MainWindow::applyInitialSize);
+}
+
+void MainWindow::applyInitialSize() {
+    layout()->activate();
+    const QRect available = screen()->availableGeometry();
+    const QSize frame = frameGeometry().size() - size();
+    const QSize limit = available.size() - frame;
+    const auto* controlLayout = m_startWorkScroll->widget()->layout();
+    const int workWidth = controlLayout->minimumSize().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    const auto startMargins = m_startSplitter->parentWidget()->layout()->contentsMargins();
+    const auto workspaceMargins = m_workflowTabs->parentWidget()->layout()->contentsMargins();
+    const int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth) * 2;
+    const int width = qMax(m_landingScroll->widget()->layout()->sizeHint().width(),
+        workWidth + m_startSplitter->widget(0)->minimumWidth() + m_startSplitter->handleWidth() +
+        startMargins.left() + startMargins.right() + workspaceMargins.left() + workspaceMargins.right() + frameWidth);
+    const int targetWidth = qMin(width, limit.width());
+    const auto* startLayout = m_startSplitter->parentWidget()->layout();
+    const auto* workspaceLayout = m_workflowTabs->parentWidget()->layout();
+    const int chromeHeight = startMargins.top() + startMargins.bottom() +
+        workspaceMargins.top() + workspaceMargins.bottom() + m_directionLabel->sizeHint().height() +
+        startLayout->spacing() + workspaceLayout->itemAt(0)->sizeHint().height() + workspaceLayout->spacing() +
+        m_workflowTabs->findChild<QTabBar*>()->sizeHint().height() + frameWidth + menuBar()->sizeHint().height();
+    // Reserve one line of feedback so opening a task does not squeeze the count form.
+    const int workHeight = qMax(controlLayout->minimumSize().height(), controlLayout->minimumHeightForWidth(workWidth)) +
+        chromeHeight + fontMetrics().height() + 24;
+    resize(targetWidth, qMin(qMax(minimumSizeHint().height(), workHeight), limit.height()));
+    layout()->activate();
+    const auto* landingLayout = m_landingScroll->widget()->layout();
+    const int landingHeight = qMax(landingLayout->minimumSize().height(),
+        landingLayout->minimumHeightForWidth(m_landingScroll->viewport()->width()));
+    const int height = qMax(landingHeight + menuBar()->height(), workHeight);
+    resize(targetWidth, qMin(height, limit.height()));
+    if (isVisible()) {
+        const QPoint decoration = pos() - frameGeometry().topLeft();
+        move(available.center() - QPoint(frameGeometry().width() / 2, frameGeometry().height() / 2) + decoration);
+    }
 }
 
 QWidget* MainWindow::createLandingPage() {
@@ -120,7 +154,6 @@ QWidget* MainWindow::createLandingPage() {
     UiText::bind(explanation, "text", QT_TRANSLATE_NOOP("App", "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
         "Направление преобразования определяется самим вариантом."));
     explanation->setWordWrap(true);
-    explanation->setAlignment(Qt::AlignCenter);
     outer->addWidget(title);
     outer->addWidget(explanation);
 
@@ -178,7 +211,6 @@ QWidget* MainWindow::createLandingPage() {
 
     auto* actionHint = new WrappingLabel;
     UiText::bind(actionHint, "text", QT_TRANSLATE_NOOP("App", "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
-    actionHint->setAlignment(Qt::AlignCenter);
     actionHint->setWordWrap(true);
     outer->addWidget(actionHint);
     auto* actions = new QHBoxLayout;
@@ -200,7 +232,8 @@ QWidget* MainWindow::createLandingPage() {
             this, &MainWindow::updateVariantSelection);
     connect(m_beginButton, &QPushButton::clicked, this, &MainWindow::beginWork);
     connect(openProgressButton, &QPushButton::clicked, this, &MainWindow::openProgress);
-    return page;
+    m_landingScroll = new WorkScrollArea(page);
+    return m_landingScroll;
 }
 
 QWidget* MainWindow::createWorkspacePage() {
@@ -273,8 +306,9 @@ QWidget* MainWindow::createStartPage() {
     right->addWidget(instructionsGroup);
     auto* counts = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Проверьте структуру исходного автомата"));
     auto* countLayout = new QFormLayout(counts);
+    countLayout->setObjectName("sourceCountsForm");
     countLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    countLayout->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    countLayout->setRowWrapPolicy(QFormLayout::DontWrapRows);
     m_stateCount = new QSpinBox;
     m_inputCount = new QSpinBox;
     m_outputCount = new QSpinBox;
@@ -291,10 +325,11 @@ QWidget* MainWindow::createStartPage() {
     countLayout->addRow(accept);
     right->addWidget(counts);
     right->addStretch();
-    auto* workScroll = new WorkScrollArea(workPanel);
-    auto* splitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, workScroll,
+    m_startWorkScroll = new WorkScrollArea(workPanel);
+    m_startWorkScroll->setObjectName("startWorkArea");
+    m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, m_startWorkScroll,
                                       "startAssignment", Qt::Horizontal);
-    layout->addWidget(splitter, 1);
+    layout->addWidget(m_startSplitter, 1);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
     auto invalidate = [this] {
         if (!m_countsAccepted) return;
@@ -332,7 +367,7 @@ QWidget* MainWindow::createReportPage() {
     layout->addWidget(create, 0, Qt::AlignCenter);
     layout->addStretch();
     connect(create, &QPushButton::clicked, this, &MainWindow::createReport);
-    return page;
+    return new WorkScrollArea(page);
 }
 
 void MainWindow::createMenus() {
@@ -451,6 +486,7 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_sourceEditor->setTask(variant, AutomatonKind::Moore);
     m_targetEditor->setTask(variant, AutomatonKind::Mealy);
     m_workflowTabs->setCurrentIndex(0);
+    QTimer::singleShot(0, this, &MainWindow::fitStartPage);
     m_teacherName->clear();
     m_studentName->clear();
     m_group->clear(); m_recordBook->clear();
@@ -458,6 +494,26 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_saveAsAction->setEnabled(true);
     updateWorkflowState();
     return true;
+}
+
+void MainWindow::fitStartPage() {
+    if (m_workflowTabs->currentIndex() != 0) return;
+    const auto* controls = m_startWorkScroll->widget()->layout();
+    const int workWidth = controls->minimumSize().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    m_startSplitter->setHintExtent(qMax(m_startSplitter->widget(0)->minimumWidth(),
+        m_startSplitter->width() - m_startSplitter->handleWidth() - workWidth));
+    if (m_workspaceSizeApplied) return;
+    m_workspaceSizeApplied = true;
+    // Once shown, native controls and wrapped instructions have their final metrics.
+    const int contentHeight = qMax(controls->minimumSize().height(),
+        controls->minimumHeightForWidth(m_startWorkScroll->viewport()->width()));
+    const int heightNeeded = height() - m_startWorkScroll->viewport()->height() + contentHeight;
+    const auto available = screen()->availableGeometry();
+    const auto decorationSize = frameGeometry().size() - size();
+    resize(width(), qMin(qMax(height(), heightNeeded), available.height() - decorationSize.height()));
+    const auto frame = frameGeometry();
+    const int top = qBound(available.top(), frame.top(), qMax(available.top(), available.bottom() - frame.height() + 1));
+    move(pos() + QPoint(0, top - frame.top()));
 }
 
 void MainWindow::acceptCounts() {

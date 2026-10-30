@@ -4,6 +4,7 @@
 
 WrappingLabel::WrappingLabel(QWidget *parent) : QLabel(parent) {
     setWordWrap(true);
+    setAlignment(Qt::AlignJustify | Qt::AlignTop);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 }
 QSize WrappingLabel::minimumSizeHint() const {

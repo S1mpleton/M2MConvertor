@@ -14,6 +14,7 @@ class HintSplitter;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
+class QLineEdit;
 
 class AutomatonEditor : public QWidget {
     Q_OBJECT
@@ -41,6 +42,9 @@ private:
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, Message* error) const;
     void configureMatrix();
+    void resetMatrix();
+    void buildMatrix(int size);
+    void clearMatrix();
     void updateReference(QTableWidget* table) const;
     bool readMatrix(Automaton* result, Message* error) const;
     bool readGraph(Automaton* result, Message* error) const;
@@ -76,7 +80,9 @@ private:
     QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
 
-    QLabel* m_matrixDimension;
+    QLineEdit* m_matrixDimension;
+    QWidget* m_matrixContent;
+    QPushButton* m_clearMatrixButton;
     QLabel* m_outputCaption;
     QTableWidget* m_matrixOutputs;
     QTableWidget* m_matrixTable;

@@ -37,6 +37,8 @@
 #include <QLineF>
 #include <QPalette>
 #include <QPushButton>
+#include <QScreen>
+#include <QFormLayout>
 #include <QStackedWidget>
 #include <QTabWidget>
 #include <QTest>
@@ -82,7 +84,6 @@ struct MainWindowTestAccess {
 };
 
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
-    window.resize(1100, 820);
     window.activateWindow(); window.raise(); QApplication::processEvents();
     QTemporaryDir temporary;
     auto variant = trainingVariantJson();
@@ -99,6 +100,24 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(combo->currentData().toInt() == 7 &&
         !(combo->model()->flags(combo->model()->index(0, 0)) & Qt::ItemIsEnabled), "unfinished direction disabled");
     MainWindowTestAccess::begin(window);
+    QApplication::processEvents();
+    QApplication::processEvents();
+    QApplication::processEvents();
+    auto* countForm = window.findChild<QFormLayout*>("sourceCountsForm");
+    for (int row = 0; row < 3; ++row) {
+        auto* label = countForm->itemAt(row, QFormLayout::LabelRole)->widget();
+        auto* field = countForm->itemAt(row, QFormLayout::FieldRole)->widget();
+        require(qAbs(label->geometry().center().y() - field->geometry().center().y()) <= 2,
+            "count fields stay on the same row as their labels at the startup size");
+    }
+    require(window.findChild<WorkScrollArea*>("startWorkArea")->horizontalScrollBar()->maximum() == 0,
+        "startup splitter leaves enough width to show the whole count form");
+    require(window.screen()->availableGeometry().contains(window.frameGeometry()), "opening a task keeps the frame on screen");
+    if (window.frameGeometry().height() < window.screen()->availableGeometry().height() - 1)
+        require(window.findChild<WorkScrollArea*>("startWorkArea")->verticalScrollBar()->maximum() == 0,
+            "startup form fits vertically when the screen has enough room");
+    if (!screenshot.isEmpty()) window.grab().save(screenshot + ".compact-start.png");
+    window.resize(1100, 820); QApplication::processEvents();
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".start.png");
     }
@@ -141,7 +160,30 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(source->toJson().value("tableAccepted").toBool(), "table with final loop is also accepted");
     auto* matrix = source->findChild<QTableWidget*>("transitionMatrix");
     auto* outputs = source->findChild<QTableWidget*>("matrixOutputs");
+    auto* dimension = source->findChild<QLineEdit*>("matrixDimensionEdit");
+    auto* build = source->findChild<QPushButton*>("configureMatrixButton");
+    auto* clear = source->findChild<QPushButton*>("clearMatrixButton");
+    require(matrix->rowCount() == 0 && outputs->rowCount() == 0 && dimension->text().isEmpty() && !clear->isEnabled(),
+        "matrix waits for the user's dimension instead of building from the table");
+    for (const auto& invalid : {"text", "1.5", "0", "2"}) {
+        dimension->setText(invalid); build->click();
+        require(matrix->rowCount() == 0, "invalid or mismatched dimensions do not create a matrix");
+    }
+    {
+        MainWindow draft;
+        require(MainWindowTestAccess::restore(draft, MainWindowTestAccess::progress(window)), "work waiting for a matrix dimension restores");
+        auto* restoredEditor = draft.findChild<AutomatonEditor*>("sourceEditor");
+        require(restoredEditor->findChild<QTableWidget*>("transitionMatrix")->rowCount() == 0 &&
+            restoredEditor->findChild<QLineEdit*>("matrixDimensionEdit")->text() == "2", "restoring does not auto-build an unfinished matrix");
+    }
+    dimension->setText("1"); build->click();
     require(matrix->item(0, 0)->text() == "-", "matrix defaults to no transitions");
+    outputs->item(0, 1)->setText("y4");
+    build->click();
+    require(outputs->item(0, 1)->text() == "y4", "accepting the same dimension preserves entered cells");
+    matrix->item(0, 0)->setText("x9"); clear->click();
+    require(matrix->rowCount() == 1 && matrix->item(0, 0)->text() == "-" && outputs->item(0, 1)->text() == "-",
+        "Clear resets both matrices while keeping their dimension");
     outputs->item(0, 1)->setText("y4");
     bool c = false, y = false;
     for (auto* label : source->findChildren<QLabel*>()) { c |= label->text() == "C ="; y |= label->text() == "Y ="; }
@@ -231,6 +273,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
 
     target->findChild<QPushButton*>("acceptTableButton")->click();
     require(target->toJson().value("tableAccepted").toBool(), "Mealy table accepted");
+    require(target->findChild<QTableWidget*>("transitionMatrix")->rowCount() == 0, "Mealy matrix also waits for a dimension");
+    target->findChild<QLineEdit*>("matrixDimensionEdit")->setText("1");
+    target->findChild<QPushButton*>("configureMatrixButton")->click();
     target->findChild<QTableWidget*>("transitionMatrix")->item(0, 0)->setText("x9/y4");
     target->findChild<QPushButton*>("acceptMatrixButton")->click();
     auto* g = target->findChild<AutomatonGraphEditor*>(); g->createVertex();
@@ -433,9 +478,8 @@ int main(int argc, char** argv) {
     MainWindow window;
     window.show();
     app.processEvents();
-    require(qAbs(window.width() - window.minimumSizeHint().width()) <= 2 &&
-            qAbs(window.height() - window.minimumSizeHint().height()) <= 2,
-            "initial window uses its minimum layout size");
+    require(window.screen()->availableGeometry().contains(window.frameGeometry()),
+            "initial window including its frame fits the available screen");
     require(window.windowTitle().contains(QStringLiteral("M2MConvertor")),
             "application title is configured");
     require(window.styleSheet().isEmpty(), "operating-system palette is not overridden");

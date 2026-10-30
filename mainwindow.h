@@ -21,6 +21,8 @@ class QTabWidget;
 class QShowEvent;
 class QEvent;
 class LogWindow;
+class WorkScrollArea;
+class HintSplitter;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -38,6 +40,8 @@ private:
     QWidget* createStartPage();
     QWidget* createReportPage();
     void createMenus();
+    void applyInitialSize();
+    void fitStartPage();
     void refreshTexts();
     void showResult(const Result& result);
     void displayResult(const Result& result);
@@ -69,6 +73,9 @@ private:
     QLabel* m_variantTitle;
     QLabel* m_directionLabel;
     TaskImage* m_diagramLabel;
+    WorkScrollArea* m_landingScroll;
+    WorkScrollArea* m_startWorkScroll;
+    HintSplitter* m_startSplitter;
     QSpinBox* m_stateCount;
     QSpinBox* m_inputCount;
     QSpinBox* m_outputCount;
@@ -93,6 +100,7 @@ private:
     QString m_archivePath;
     QString m_progressPath;
     bool m_initialSizeApplied = false;
+    bool m_workspaceSizeApplied = false;
     bool m_hasVariant = false;
     bool m_countsAccepted = false;
 };

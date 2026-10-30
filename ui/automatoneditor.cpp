@@ -18,6 +18,7 @@
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QPixmap>
@@ -100,15 +101,27 @@ QWidget* AutomatonEditor::createMatrixPage() {
     m_matrixReference = new QTableWidget;
     m_matrixReference->setObjectName("matrixReference");
     auto* row = new QHBoxLayout;
-    m_matrixDimension = new QLabel;
-    auto* create = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить матрицу"));
+    m_clearMatrixButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить матрицу"));
+    m_clearMatrixButton->setObjectName("clearMatrixButton");
+    m_clearMatrixButton->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
+    m_clearMatrixButton->setEnabled(false);
+    row->addWidget(m_clearMatrixButton);
+    row->addStretch();
+    m_matrixDimension = new QLineEdit;
+    m_matrixDimension->setObjectName("matrixDimensionEdit");
+    m_matrixDimension->setMaximumWidth(fontMetrics().horizontalAdvance("000000") + 28);
+    UiText::bind(m_matrixDimension, "accessibleName", QT_TRANSLATE_NOOP("App", "Размерность матрицы"));
+    auto* create = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
     create->setObjectName("configureMatrixButton");
-    create->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
+    create->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
     row->addWidget(UiText::make<QLabel>(QT_TRANSLATE_NOOP("App", "Размерность:")));
     row->addWidget(m_matrixDimension);
     row->addWidget(create);
-    row->addStretch();
     layout->addLayout(row);
+    m_matrixContent = new QWidget;
+    auto* contentLayout = new QVBoxLayout(m_matrixContent);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(8);
     m_matrixTable = new QTableWidget;
     m_matrixTable->setObjectName("transitionMatrix");
     m_matrixTable->setItemDelegate(new PlainCellDelegate(m_matrixTable));
@@ -131,17 +144,22 @@ QWidget* AutomatonEditor::createMatrixPage() {
     m_outputCaption = new QLabel("Y =");
     tables->addWidget(m_outputCaption);
     tables->addWidget(m_matrixOutputs, 1);
-    layout->addLayout(tables, 1);
+    contentLayout->addLayout(tables, 1);
     auto* hint = new WrappingLabel;
     UiText::bind(hint, "text", QT_TRANSLATE_NOOP("App", "В каждой ячейке укажите метки дуг через «;». Для Мили: «вход / выход1,выход2»; "
         "для Мура: «x1, x2». Строка — откуда, столбец — куда. Выходы Мура заполните в таблице справа."));
     hint->setWordWrap(true);
-    layout->addWidget(hint);
+    contentLayout->addWidget(hint);
     auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять матрицу"));
     accept->setObjectName("acceptMatrixButton");
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    layout->addWidget(accept, 0, Qt::AlignRight);
+    contentLayout->addWidget(accept, 0, Qt::AlignRight);
+    layout->addWidget(m_matrixContent, 1);
+    layout->addStretch();
+    m_matrixContent->hide();
+    connect(m_clearMatrixButton, &QPushButton::clicked, this, &AutomatonEditor::clearMatrix);
     connect(create, &QPushButton::clicked, this, &AutomatonEditor::configureMatrix);
+    connect(m_matrixDimension, &QLineEdit::returnPressed, this, &AutomatonEditor::configureMatrix);
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptMatrix);
     connect(m_matrixTable, &QTableWidget::itemChanged, this, [this] { invalidateFromMatrix(); });
     connect(m_matrixOutputs, &QTableWidget::itemChanged, this, [this] { invalidateFromMatrix(); });
@@ -184,11 +202,9 @@ QWidget* AutomatonEditor::createGraphPage() {
     layout->addWidget(m_graphEditor, 1);
     auto* hint = new WrappingLabel;
     hint->setObjectName("graphInstructions");
-    UiText::bind(hint, "text", QT_TRANSLATE_NOOP("App", "Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Можно создать до 10 состояний a0…a9. Выберите исходную вершину, "
+    UiText::bind(hint, "text", QT_TRANSLATE_NOOP("App", "Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Выберите исходную вершину, "
         "затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. "
-        "Вершины можно перемещать, а дугу — перетаскивать для изменения изгиба. "
-        "Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно). Для Мили вершина подписывается «a0», "
-        "дуга — «x1 / y1» или «x2 / -». Для Мура вершина — «a0 / y1», дуга — «x1»."));
+        "Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно)."));
     hint->setWordWrap(true);
     layout->addWidget(hint);
     auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять граф"));
@@ -212,8 +228,6 @@ void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
     m_editorKind = kind;
     m_assignmentPanel->setExpanded(true); m_matrixPanel->setExpanded(true); m_graphPanel->setExpanded(true);
     resetEditor();
-    const auto& counts = task.counts(kind);
-    m_matrixDimension->setText(tr("%1 × %1").arg(counts.states));
     m_matrixOutputs->setVisible(kind == AutomatonKind::Moore);
     m_outputCaption->setVisible(kind == AutomatonKind::Moore);
     m_assignmentImage->setImageData(task.diagram);
@@ -222,10 +236,7 @@ void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
 void AutomatonEditor::resetEditor() {
     m_loading = true;
     configureTable();
-    m_matrixTable->clear();
-    m_matrixTable->setRowCount(0);
-    m_matrixTable->setColumnCount(0);
-    m_matrixOutputs->setRowCount(0);
+    resetMatrix();
     m_matrixReference->setRowCount(0);
     m_matrixReference->setColumnCount(0);
     m_graphReference->setRowCount(0);
@@ -412,7 +423,9 @@ void AutomatonEditor::acceptTable() {
     m_tableAutomaton = actual;
     m_tableAccepted = true;
     m_tabs->setTabEnabled(1, true);
-    if (!alreadyAccepted) configureMatrix();
+    updateReference(m_matrixReference);
+    updateReference(m_graphReference);
+    if (!alreadyAccepted) resetMatrix();
     m_tabs->setCurrentIndex(1);
 }
 
@@ -442,13 +455,40 @@ void AutomatonEditor::updateReference(QTableWidget* table) const {
 
 void AutomatonEditor::configureMatrix() {
     if (!m_tableAccepted) return;
-    updateReference(m_matrixReference);
-    updateReference(m_graphReference);
-    const int size = m_task.counts(m_editorKind).states;
+    const auto text = m_matrixDimension->text().trimmed();
+    bool ok = false;
+    const int size = text.toInt(&ok);
+    if (!ok || !QRegularExpression("^[0-9]+$").match(text).hasMatch() || size < 1) {
+        showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Введите размерность матрицы одним положительным целым числом.")), false);
+        m_matrixDimension->setFocus();
+        return;
+    }
+    if (size != m_tableAutomaton.states.size()) {
+        showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Размерность матрицы должна совпадать с числом состояний принятой таблицы: %1.")).arg(m_tableAutomaton.states.size()), false);
+        m_matrixDimension->setFocus();
+        return;
+    }
     if (qint64(size) * size > 250000) {
         showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Матрица слишком велика для редактора (более 250 000 ячеек).")), false);
         return;
     }
+    if (m_matrixTable->rowCount() != size) buildMatrix(size);
+}
+
+void AutomatonEditor::resetMatrix() {
+    const QSignalBlocker matrixBlocker(m_matrixTable), outputBlocker(m_matrixOutputs);
+    m_matrixDimension->clear();
+    m_matrixTable->clear();
+    m_matrixTable->setRowCount(0);
+    m_matrixTable->setColumnCount(0);
+    m_matrixOutputs->setRowCount(0);
+    m_matrixContent->hide();
+    m_clearMatrixButton->setEnabled(false);
+    invalidateFromMatrix();
+}
+
+void AutomatonEditor::buildMatrix(int size) {
+    const bool loading = m_loading;
     m_loading = true;
     m_matrixTable->clear();
     m_matrixTable->setRowCount(size);
@@ -464,8 +504,14 @@ void AutomatonEditor::configureMatrix() {
         m_matrixOutputs->setItem(state, 1, new QTableWidgetItem("-"));
     }
     ensureItems(m_matrixTable);
-    m_loading = false;
+    m_matrixContent->show();
+    m_clearMatrixButton->setEnabled(true);
+    m_loading = loading;
     invalidateFromMatrix();
+}
+
+void AutomatonEditor::clearMatrix() {
+    if (m_matrixTable->rowCount() > 0) buildMatrix(m_matrixTable->rowCount());
 }
 
 bool AutomatonEditor::readMatrix(Automaton* result, Message* error) const {
@@ -744,6 +790,7 @@ QJsonObject AutomatonEditor::toJson() const {
     object.insert(QStringLiteral("table"), tableToJson(m_transitionTable));
     object.insert(QStringLiteral("matrixOutputs"), tableToJson(m_matrixOutputs));
     object.insert(QStringLiteral("matrix"), tableToJson(m_matrixTable));
+    object.insert("matrixDimension", m_matrixDimension->text());
     object.insert(QStringLiteral("graph"), m_graphEditor->toJson());
     object.insert(QStringLiteral("tableAccepted"), m_tableAccepted);
     object.insert(QStringLiteral("matrixAccepted"), m_matrixAccepted);
@@ -786,7 +833,16 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
     if (m_tableAccepted) {
         m_tableAutomaton = actual;
         m_tabs->setTabEnabled(1, true);
-        configureMatrix();
+        updateReference(m_matrixReference);
+        updateReference(m_graphReference);
+        const int size = m_tableAutomaton.states.size();
+        const auto savedMatrix = object.value("matrix").toArray();
+        if (savedMatrix.size() == size && qint64(size) * size <= 250000) {
+            buildMatrix(size);
+            m_matrixDimension->setText(QString::number(size));
+        }
+        if (object.contains("matrixDimension"))
+            m_matrixDimension->setText(object.value("matrixDimension").toString());
         m_loading = true;
         tableFromJson(m_matrixTable, object.value("matrix").toArray());
         // State labels are generated, never trusted from a progress file.

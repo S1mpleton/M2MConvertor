@@ -22,6 +22,7 @@ class HintHandle : public QSplitterHandle {
     void paintEvent(QPaintEvent* event) override {
         QSplitterHandle::paintEvent(event);
         QPainter painter(this);
+        painter.fillRect(rect(), palette().brush(QPalette::Dark));
         painter.setPen(palette().color(hasFocus() ? QPalette::Highlight : QPalette::Mid));
         const auto c = rect().center();
         for (int offset : {-2, 1}) {

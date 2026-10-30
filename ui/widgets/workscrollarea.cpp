@@ -9,6 +9,10 @@ WorkScrollArea::WorkScrollArea(QWidget* content, QWidget* parent) : QScrollArea(
     setWidgetResizable(false);
     content->layout()->setSizeConstraint(QLayout::SetDefaultConstraint);
     setWidget(content);
+    // Let the containing page paint one continuous surface behind the splitter.
+    setAutoFillBackground(false);
+    viewport()->setAutoFillBackground(false);
+    content->setAutoFillBackground(false);
     content->installEventFilter(this);
     viewport()->installEventFilter(this);
     fitContent();
