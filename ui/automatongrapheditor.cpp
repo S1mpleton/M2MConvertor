@@ -414,7 +414,7 @@ void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
         tr("Выходы y0…y9 через запятую, либо «-»:"),
         vertex->label().section('/', 1).trimmed(), &accepted);
     if (accepted) {
-        vertex->setLabel(state + QStringLiteral(" / ") + (value.isEmpty() ? QStringLiteral("-") : value));
+        vertex->setLabel(state + QStringLiteral(" / ") + (value.trimmed().isEmpty() ? QStringLiteral("-") : value));
             updateSceneBounds();
         emit graphChanged();
     }
@@ -428,7 +428,7 @@ void AutomatonGraphEditor::editEdge(GraphEdgeItem* edge) {
     const QString value = editText(this, tr("Подпись дуги"), hint,
         edge->label(), &accepted);
     if (accepted) {
-        edge->setLabel(value);
+        edge->setLabel(value.trimmed().isEmpty() ? QStringLiteral("-") : value);
         updateSceneBounds();
         emit graphChanged();
     }

@@ -4,7 +4,11 @@
 #include "ui/automatoneditor.h"
 #include "ui/widgets/feedbacklabel.h"
 #include "ui/widgets/taskimage.h"
-#include "ui/widgets/collapsiblepanel.h"
+#include "ui/widgets/hintsplitter.h"
+#include "ui/widgets/wrappinglabel.h"
+#include <QShowEvent>
+#include <QTimer>
+#include "ui/widgets/workscrollarea.h"
 #include "ui/workflowtabs.h"
 #include "ui/appicons.h"
 
@@ -30,7 +34,6 @@
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStackedWidget>
-#include <QStatusBar>
 #include <QStandardItemModel>
 #include <QStyle>
 #include <QTabWidget>
@@ -53,20 +56,39 @@ QString automatonSummary(const Automaton& automaton) {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle(tr("M2MConvertor — эквивалентные автоматы"));
-    resize(1200, 820);
-    setMinimumSize(900, 640);
     m_pages = new QStackedWidget;
     m_pages->addWidget(createLandingPage());
     m_pages->addWidget(createWorkspacePage());
-    setCentralWidget(m_pages);
+    auto* central = new QWidget;
+    auto* centralLayout = new QVBoxLayout(central);
+    centralLayout->setContentsMargins(0, 0, 0, 0); centralLayout->setSpacing(0);
+    centralLayout->addWidget(m_pages, 1);
+    setCentralWidget(central);
     createMenus();
     m_notification = new FeedbackLabel;
     m_notification->setObjectName("applicationNotification");
-    statusBar()->addWidget(m_notification, 1);
-    connect(m_notification, &FeedbackLabel::activeChanged, statusBar(), &QWidget::setVisible);
-    statusBar()->hide();
+    auto* notificationArea = new QWidget;
+    notificationArea->setObjectName("notificationArea");
+    auto* notificationLayout = new QVBoxLayout(notificationArea);
+    notificationLayout->setContentsMargins(10, 0, 10, 8);
+    notificationLayout->addWidget(m_notification);
+    centralLayout->addWidget(notificationArea);
+    connect(m_notification, &FeedbackLabel::activeChanged, notificationArea, &QWidget::setVisible);
+    notificationArea->hide();
     for (auto* editor : {m_sourceEditor, m_targetEditor})
         connect(editor, &AutomatonEditor::feedbackRequested, this, &MainWindow::setFeedback);
+    layout()->activate();
+    resize(minimumSizeHint().expandedTo(QSize(0, 0)));
+}
+
+void MainWindow::showEvent(QShowEvent* event) {
+    QMainWindow::showEvent(event);
+    if (m_initialSizeApplied) return;
+    m_initialSizeApplied = true;
+    QTimer::singleShot(0, this, [this] {
+        layout()->activate();
+        resize(minimumSizeHint().expandedTo(QSize(0, 0)));
+    });
 }
 
 QWidget* MainWindow::createLandingPage() {
@@ -74,14 +96,16 @@ QWidget* MainWindow::createLandingPage() {
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(36, 28, 36, 32);
     outer->setSpacing(18);
-    auto* title = new QLabel(tr("Преобразование конечных автоматов Мили и Мура"));
+    auto* title = new WrappingLabel;
+    title->setText(tr("Преобразование конечных автоматов Мили и Мура"));
     title->setObjectName(QStringLiteral("landingTitle"));
     QFont titleFont = title->font();
     titleFont.setPointSize(17);
     titleFont.setBold(true);
     title->setFont(titleFont);
     title->setAlignment(Qt::AlignCenter);
-    auto* explanation = new QLabel(tr(
+    auto* explanation = new WrappingLabel;
+    explanation->setText(tr(
         "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
         "Направление преобразования определяется самим вариантом."));
     explanation->setWordWrap(true);
@@ -99,28 +123,29 @@ QWidget* MainWindow::createLandingPage() {
     auto* archiveLayout = new QVBoxLayout(archiveGroup);
     archiveLayout->setContentsMargins(20, 24, 20, 20);
     archiveLayout->setSpacing(14);
-    auto* archiveHint = new QLabel(tr(
+    auto* archiveHint = new WrappingLabel;
+    archiveHint->setText(tr(
         "Выберите файл .m2m с реакциями, экспортированный из M2MTools. "
         "Приложение проверит целостность архива перед показом вариантов."));
     archiveHint->setWordWrap(true);
     archiveLayout->addWidget(archiveHint);
-    auto* archiveRow = new QHBoxLayout;
-    m_archivePathLabel = new QLabel(tr("BazaVar не выбран"));
+    m_archivePathLabel = new WrappingLabel;
+    m_archivePathLabel->setText(tr("BazaVar не выбран"));
     m_archivePathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_archivePathLabel->setWordWrap(true);
     auto* archiveButton = new QPushButton(tr("Открыть BazaVar…"));
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
-    archiveRow->addWidget(m_archivePathLabel, 1);
-    archiveRow->addWidget(archiveButton);
-    archiveLayout->addLayout(archiveRow);
+    archiveLayout->addWidget(m_archivePathLabel);
+    archiveLayout->addWidget(archiveButton, 0, Qt::AlignLeft);
     archiveLayout->addStretch();
 
     auto* variantGroup = new QGroupBox(tr("2. Вариант работы"));
     auto* variantLayout = new QVBoxLayout(variantGroup);
     variantLayout->setContentsMargins(20, 24, 20, 20);
     variantLayout->setSpacing(14);
-    auto* variantHint = new QLabel(tr(
+    auto* variantHint = new WrappingLabel;
+    variantHint->setText(tr(
         "Выберите номер варианта. Направление преобразования уже задано в базе "
         "и будет выбрано автоматически."));
     variantHint->setWordWrap(true);
@@ -130,7 +155,8 @@ QWidget* MainWindow::createLandingPage() {
     m_variantCombo = new QComboBox;
     m_variantCombo->setObjectName("variantCombo");
     m_variantCombo->setEnabled(false);
-    m_landingDirection = new QLabel(tr("—"));
+    m_landingDirection = new WrappingLabel;
+    m_landingDirection->setText(tr("—"));
     m_landingDirection->setWordWrap(true);
     form->addRow(tr("Вариант:"), m_variantCombo);
     form->addRow(tr("Преобразование:"), m_landingDirection);
@@ -141,7 +167,8 @@ QWidget* MainWindow::createLandingPage() {
     contentLayout->addWidget(variantGroup, 1);
     outer->addWidget(content, 1);
 
-    auto* actionHint = new QLabel(tr(
+    auto* actionHint = new WrappingLabel;
+    actionHint->setText(tr(
         "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
     actionHint->setAlignment(Qt::AlignCenter);
     actionHint->setWordWrap(true);
@@ -171,10 +198,11 @@ QWidget* MainWindow::createLandingPage() {
 QWidget* MainWindow::createWorkspacePage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(10, 10, 10, 10);
     auto* top = new QHBoxLayout;
     auto* back = new QPushButton(tr("К выбору варианта"));
     back->setIcon(AppIcons::icon(AppIcons::Kind::Back));
-    m_variantTitle = new QLabel;
+    m_variantTitle = new WrappingLabel;
     QFont font = m_variantTitle->font();
     font.setPointSize(13);
     font.setBold(true);
@@ -220,20 +248,17 @@ QWidget* MainWindow::createStartPage() {
     m_directionLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(m_directionLabel);
 
-    auto* splitter = new QSplitter(Qt::Horizontal);
-    splitter->setChildrenCollapsible(false);
     m_diagramLabel = new TaskImage;
     m_diagramLabel->setObjectName("startTaskImage");
-    auto* assignmentGroup = new CollapsiblePanel(tr("Задание варианта"), m_diagramLabel, "startAssignment");
-    assignmentGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     auto* workPanel = new QWidget;
     auto* right = new QVBoxLayout(workPanel);
-    right->setContentsMargins(8, 0, 0, 0);
+    right->setContentsMargins(0, 0, 0, 0);
     right->setSpacing(14);
     auto* instructionsGroup = new QGroupBox(tr("Порядок работы"));
     auto* instructionsLayout = new QVBoxLayout(instructionsGroup);
-    auto* instructions = new QLabel(tr(
+    auto* instructions = new WrappingLabel;
+    instructions->setText(tr(
         "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
         "ответа откроется последовательная работа с таблицей, матрицей и графом."));
     instructions->setWordWrap(true);
@@ -242,6 +267,7 @@ QWidget* MainWindow::createStartPage() {
     auto* counts = new QGroupBox(tr("Проверьте структуру исходного автомата"));
     auto* countLayout = new QFormLayout(counts);
     countLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    countLayout->setRowWrapPolicy(QFormLayout::WrapLongRows);
     m_stateCount = new QSpinBox;
     m_inputCount = new QSpinBox;
     m_outputCount = new QSpinBox;
@@ -258,10 +284,9 @@ QWidget* MainWindow::createStartPage() {
     countLayout->addRow(accept);
     right->addWidget(counts);
     right->addStretch();
-    splitter->addWidget(assignmentGroup);
-    splitter->addWidget(workPanel);
-    splitter->setStretchFactor(0, 3);
-    splitter->setStretchFactor(1, 2);
+    auto* workScroll = new WorkScrollArea(workPanel);
+    auto* splitter = new HintSplitter(tr("Задание варианта"), m_diagramLabel, workScroll,
+                                      "startAssignment", Qt::Horizontal);
     layout->addWidget(splitter, 1);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
     auto invalidate = [this] {

@@ -10,7 +10,7 @@
 class AutomatonGraphEditor;
 class QLabel;
 class TaskImage;
-class CollapsiblePanel;
+class HintSplitter;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
@@ -41,6 +41,7 @@ private:
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
     void configureTable();
+    void fillEmptyCells(QTableWidget* table) const;
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, QString* error) const;
     void configureMatrix();
@@ -72,9 +73,9 @@ private:
 
     QTabWidget* m_tabs;
     TaskImage* m_assignmentImage;
-    CollapsiblePanel* m_assignmentPanel;
-    CollapsiblePanel* m_matrixPanel;
-    CollapsiblePanel* m_graphPanel;
+    HintSplitter* m_assignmentPanel;
+    HintSplitter* m_matrixPanel;
+    HintSplitter* m_graphPanel;
     QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
 

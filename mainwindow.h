@@ -17,11 +17,15 @@ class QPushButton;
 class QSpinBox;
 class QStackedWidget;
 class QTabWidget;
+class QShowEvent;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+
+protected:
+    void showEvent(QShowEvent* event) override;
 
 private:
     friend struct MainWindowTestAccess;
@@ -74,6 +78,7 @@ private:
     TrainingVariant m_currentVariant;
     QString m_archivePath;
     QString m_progressPath;
+    bool m_initialSizeApplied = false;
     bool m_hasVariant = false;
     bool m_countsAccepted = false;
 };

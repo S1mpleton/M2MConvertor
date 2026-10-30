@@ -51,12 +51,13 @@ void MealyCellDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
                                      const QModelIndex& index) const {
     auto* state = editor->findChild<QLineEdit*>("destinationEditor");
     if (!state) {
-        QStyledItemDelegate::setModelData(editor, model, index);
+        PlainCellDelegate::setModelData(editor, model, index);
         return;
     }
-    model->setData(index,
-                   state->text() + "/" + editor->findChild<QLineEdit*>("outputsEditor")->text(),
-                   Qt::EditRole);
+    const auto value = [](QLineEdit* field) {
+        return field->text().trimmed().isEmpty() ? QStringLiteral("-") : field->text();
+    };
+    model->setData(index, value(state) + "/" + value(editor->findChild<QLineEdit*>("outputsEditor")), Qt::EditRole);
 }
 void MealyCellDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
                                              const QModelIndex& index) const {

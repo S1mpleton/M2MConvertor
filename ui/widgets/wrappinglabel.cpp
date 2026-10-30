@@ -6,6 +6,9 @@ WrappingLabel::WrappingLabel(QWidget *parent) : QLabel(parent) {
     setWordWrap(true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 }
+QSize WrappingLabel::minimumSizeHint() const {
+    return QSize(0, text().isEmpty() ? 0 : fontMetrics().height());
+}
 void WrappingLabel::refreshHeight() {
     // QLabel::heightForWidth also respects minimumHeight. Drop the previous
     // constraint first so a wider label or smaller font can reduce its height.

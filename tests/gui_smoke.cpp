@@ -3,8 +3,10 @@
 #include "ui/automatoneditor.h"
 #include "ui/mealycelldelegate.h"
 #include "ui/widgets/taskimage.h"
-#include "ui/widgets/collapsiblepanel.h"
-#include <QStatusBar>
+#include "ui/widgets/hintsplitter.h"
+#include "ui/widgets/workscrollarea.h"
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QBuffer>
 #include <QToolButton>
 #include "ui/widgets/feedbacklabel.h"
@@ -71,6 +73,7 @@ struct MainWindowTestAccess {
 };
 
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
+    window.resize(1100, 820);
     window.activateWindow(); window.raise(); QApplication::processEvents();
     QTemporaryDir temporary;
     auto variant = trainingVariantJson();
@@ -105,6 +108,13 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(freeInput && !freeInput->validator(), "Moore input has no typing validator");
     QTest::keyClicks(freeInput, "bad @ input"); QTest::keyClick(freeInput, Qt::Key_Return); QApplication::processEvents();
     require(table->item(4, 0)->text() == "bad @ input", "invalid drafts are saved unchanged");
+    table->editItem(table->item(4, 0)); QApplication::processEvents();
+    for (auto* edit : table->findChildren<QLineEdit*>()) {
+        if (!edit->isVisible()) continue;
+        edit->clear(); QTest::keyClick(edit, Qt::Key_Return); break;
+    }
+    QApplication::processEvents();
+    require(table->item(4, 0)->text() == "-", "cleared single field becomes dash on commit");
     source->findChild<QPushButton*>("acceptTableButton")->click();
     require(!source->toJson().value("tableAccepted").toBool() &&
         window.findChild<FeedbackLabel*>("applicationNotification")->text().contains("x0"),
@@ -113,7 +123,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".table.png");
     }
+    table->item(4, 1)->setText(" ");
     source->findChild<QPushButton*>("acceptTableButton")->click();
+    require(table->item(4, 1)->text() == "-", "empty Moore cell normalizes on Accept");
     require(source->toJson().value("tableAccepted").toBool(), "screenshot's table without a transition is accepted");
     table->item(4, 1)->setText("a0");
     source->findChild<QPushButton*>("acceptTableButton")->click();
@@ -151,12 +163,18 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* instructions = source->findChild<QLabel*>("graphInstructions");
     QApplication::processEvents();
     require(instructions->geometry().top() > graph->geometry().bottom(), "graph instructions do not overlap the canvas");
-    auto* toggle = source->findChild<QToolButton*>("graphHintToggle");
+    auto* divider = source->findChild<HintSplitter*>("graphHint");
+
+    require(divider && !source->findChild<QToolButton*>("graphHintToggle"), "hint uses a splitter without a toggle button");
+    auto* workArea = qobject_cast<WorkScrollArea*>(divider->widget(1));
+    require(workArea && workArea->verticalScrollBar()->maximum() == 0 &&
+        workArea->horizontalScrollBar()->maximum() == 0,
+        "instructions and acceptance remain visible without outer scrolling in a regular window");
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".graph-reference.png");
     }
-    toggle->click(); QApplication::processEvents();
-    require(graphReference->isHidden() && source->completed(), "hiding graph reference keeps acceptance");
+    divider->setExpanded(false); QApplication::processEvents();
+    require(divider->hintExtent() == 0 && source->completed(), "hiding graph reference keeps acceptance");
     auto* t = target->findChild<QTableWidget*>("transitionTable");
     require(t->item(2, 1)->text() == "-/-", "Mealy transitions default to -/-");
     workflow->setCurrentIndex(2); QApplication::processEvents();
@@ -172,6 +190,13 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* stateEdit = editor->findChild<QLineEdit*>("destinationEditor");
     auto* outputEdit = editor->findChild<QLineEdit*>("outputsEditor");
     require(stateEdit && outputEdit && !stateEdit->validator() && !outputEdit->validator(), "neither Mealy field has a validator");
+    stateEdit->setText(""); outputEdit->setText(" ");
+    QTest::keyClick(outputEdit, Qt::Key_Return); QApplication::processEvents();
+    require(t->item(2, 1)->text() == "-/-", "empty Mealy fields become dash/dash");
+    t->editItem(t->item(2, 1)); QApplication::processEvents();
+    editor = activeEditor(); require(editor, "Mealy editor reopens");
+    stateEdit = editor->findChild<QLineEdit*>("destinationEditor");
+    outputEdit = editor->findChild<QLineEdit*>("outputsEditor");
     stateEdit->setText("a0, a1"); outputEdit->setText("y4");
     QTest::keyClick(outputEdit, Qt::Key_Return); QApplication::processEvents();
     require(t->item(2, 1)->text() == "a0, a1/y4", "both raw Mealy fields commit without filtering");
@@ -214,11 +239,26 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(!html.contains("Идентификатор") && !html.contains("%11") &&
         html.contains("Преподаватель &lt;&amp;&gt;") && html.contains("data:image/png;base64,"),
         "HTML report omits identifiers and keeps escaped names and embedded image");
+    workflow->setCurrentIndex(1);
+    auto* representation = source->findChild<QTabWidget*>();
+    for (const auto& size : {QSize(1100, 820), window.minimumSizeHint(), QSize(640, 480), QSize(900, 650)}) {
+        window.resize(size); QApplication::processEvents();
+        for (int tab = 0; tab < 3; ++tab) {
+            representation->setCurrentIndex(tab); QApplication::processEvents();
+            auto* active = representation->currentWidget();
+            require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
+            for (auto* label : active->findChildren<QLabel*>()) {
+                if (label->objectName() == "graphInstructions")
+                    require(label->height() >= label->heightForWidth(label->width()) - 1, "wrapped instructions keep enough height");
+            }
+        }
+    }
+    if (!screenshot.isEmpty()) window.grab().save(screenshot + ".small-graph.png");
     MainWindow restored;
     require(MainWindowTestAccess::restore(restored, MainWindowTestAccess::progress(window)), "progress reloads");
     require(restored.findChild<AutomatonEditor*>("sourceEditor")->completed() &&
         restored.findChild<AutomatonEditor*>("targetEditor")->completed(), "new table and flexible graph revalidate after reload");
-    require(!restored.findChild<AutomatonEditor*>("sourceEditor")->findChild<CollapsiblePanel*>("graphHint")->expanded(),
+    require(!restored.findChild<AutomatonEditor*>("sourceEditor")->findChild<HintSplitter*>("graphHint")->expanded(),
         "hint visibility is preserved with the work");
     auto legacy = source->toJson(); legacy.remove("tableLayout");
     legacy.insert("tableInputs", QJsonArray{"x9"});
@@ -236,6 +276,31 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     table->item(1, 1)->setText("y5");
     source->findChild<QPushButton*>("acceptTableButton")->click();
     require(!source->toJson().value("tableAccepted").toBool() && !workflow->isTabEnabled(2), "wrong output invalidates downstream work");
+}
+
+void testHintDrag() {
+    auto* hint = new TaskImage;
+    auto* work = new QWidget; work->setMinimumHeight(90);
+    HintSplitter splitter("Подсказка", hint, work, "testDivider");
+    splitter.resize(600, 500); splitter.show(); QApplication::processEvents();
+    auto* handle = splitter.handle(1);
+    const int stop = splitter.widget(0)->minimumHeight();
+    auto moveTo = [&](int y) {
+        const auto global = splitter.mapToGlobal(QPoint(splitter.width() / 2, y + splitter.handleWidth() / 2));
+        QTest::mouseMove(handle, handle->mapFromGlobal(global), 20);
+    };
+    QTest::mousePress(handle, Qt::LeftButton, Qt::NoModifier, handle->rect().center());
+    moveTo(stop);
+    require(splitter.hintExtent() >= stop, "hint reaches its minimum stop before collapsing");
+    moveTo(0);
+    QTest::mouseRelease(handle, Qt::LeftButton, Qt::NoModifier, handle->rect().center());
+    require(splitter.hintExtent() == 0 && handle->height() == splitter.handleWidth(), "continued drag collapses hint to the narrow divider");
+    QTest::mousePress(handle, Qt::LeftButton, Qt::NoModifier, handle->rect().center());
+    moveTo(180);
+    QTest::mouseRelease(handle, Qt::LeftButton, Qt::NoModifier, handle->rect().center());
+    require(splitter.expanded(), "dragging the remaining handle reopens the hint");
+    QTest::mouseDClick(handle, Qt::LeftButton); require(!splitter.expanded(), "double click can collapse hint");
+    QTest::keyClick(handle, Qt::Key_Return); require(splitter.expanded(), "keyboard can restore hint");
 }
 
 void testImages() {
@@ -257,9 +322,13 @@ void testValidationAndFeedback() {
     MainWindow footerWindow;
     footerWindow.show(); QApplication::processEvents();
     auto* footer = footerWindow.findChild<FeedbackLabel*>("applicationNotification");
-    require(footerWindow.statusBar()->isHidden(), "footer reserves no space when empty");
+    require(footerWindow.findChild<QWidget*>("notificationArea")->isHidden(), "footer reserves no space when empty");
     footer->showMessage("Сохранено", UiFeedbackLevel::Success);
-    require(!footerWindow.statusBar()->isHidden(), "shared footer becomes visible for notifications");
+    require(!footerWindow.findChild<QWidget*>("notificationArea")->isHidden(), "shared footer becomes visible for notifications");
+    QApplication::processEvents();
+    const int left = footer->mapTo(&footerWindow, QPoint()).x();
+    const int right = footerWindow.width() - left - footer->width();
+    require(left == right, "notification has equal left and right margins");
     FeedbackLabel notice; notice.resize(500, 70); notice.show();
     notice.showMessage("Проверка", UiFeedbackLevel::Error);
     auto* effect = qobject_cast<QGraphicsOpacityEffect*>(notice.graphicsEffect());
@@ -268,7 +337,7 @@ void testValidationAndFeedback() {
     notice.showMessage("Верно", UiFeedbackLevel::Success);
     QTest::qWait(4000); require(effect->opacity() == 1 && notice.text() == "Верно", "new message gets full hold duration");
     QTest::qWait(550); require(notice.text().isEmpty() && effect->opacity() == 0, "message fades out and clears");
-    require(footerWindow.statusBar()->isHidden(), "expired notification frees the footer space");
+    require(footerWindow.findChild<QWidget*>("notificationArea")->isHidden(), "expired notification frees the footer space");
 }
 
 int main(int argc, char** argv) {
@@ -285,6 +354,9 @@ int main(int argc, char** argv) {
     MainWindow window;
     window.show();
     app.processEvents();
+    require(qAbs(window.width() - window.minimumSizeHint().width()) <= 2 &&
+            qAbs(window.height() - window.minimumSizeHint().height()) <= 2,
+            "initial window uses its minimum layout size");
     require(window.windowTitle().contains(QStringLiteral("M2MConvertor")),
             "application title is configured");
     require(window.styleSheet().isEmpty(), "operating-system palette is not overridden");
@@ -300,8 +372,11 @@ int main(int argc, char** argv) {
             "labels inherit a dark operating-system palette");
     auto* landingContent = window.findChild<QWidget*>(QStringLiteral("landingContent"));
     require(landingContent && landingContent->width() > window.width() * 0.8 &&
-            landingContent->height() > window.height() * 0.45,
+            landingContent->height() > 0,
             "landing content uses most of the main window");
+    for (auto* label : window.findChild<QWidget*>(QStringLiteral("landingContent"))->findChildren<QLabel*>())
+        if (label->wordWrap()) require(label->height() >= label->heightForWidth(label->width()) - 1,
+            "landing instructions fit at the startup minimum size");
     auto* workflow = window.findChild<QTabWidget*>(QStringLiteral("workflowTabs"));
     require(workflow && workflow->count() == 4, "four-stage workflow is created");
     require(workflow->tabText(0) == QString::fromUtf8("Начало работы"),
@@ -426,6 +501,7 @@ int main(int argc, char** argv) {
                 "interactive graph screenshot is saved");
     }
     testReactionWorkflow(window, argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
+    testHintDrag();
     testImages();
     testValidationAndFeedback();
     std::cout << "PASS GUI startup, workflow gates and interactive graph editor\n";

@@ -1,10 +1,10 @@
 #pragma once
-#include <QStyledItemDelegate>
+#include "ui/plaincelldelegate.h"
 
 // Editing is unrestricted. The automaton parser checks the committed values on Accept.
-class MealyCellDelegate : public QStyledItemDelegate {
+class MealyCellDelegate : public PlainCellDelegate {
   public:
-    explicit MealyCellDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
+    explicit MealyCellDelegate(QObject* parent = nullptr) : PlainCellDelegate(parent) {}
     QWidget* createEditor(QWidget*, const QStyleOptionViewItem&, const QModelIndex&) const override;
     void setEditorData(QWidget*, const QModelIndex&) const override;
     void setModelData(QWidget*, QAbstractItemModel*, const QModelIndex&) const override;

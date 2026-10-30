@@ -8,6 +8,7 @@ class WrappingLabel : public QLabel {
   public:
     explicit WrappingLabel(QWidget *parent = nullptr);
     void refreshHeight();
+    QSize minimumSizeHint() const override;
 
   protected:
     void resizeEvent(QResizeEvent *event) override;
