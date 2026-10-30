@@ -30,11 +30,15 @@ public:
     QJsonObject answerData() const;
     void fromJson(const QJsonObject& object);
 
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override;
+
 signals:
     void completedChanged(bool completed);
     void feedbackRequested(const Result& result);
 
 private:
+    QString cellHelp(const QTableWidget* table, int row, int column) const;
     QWidget* createTablePage();
     QWidget* createMatrixPage();
     QWidget* createGraphPage();

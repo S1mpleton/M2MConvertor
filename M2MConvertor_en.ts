@@ -135,13 +135,13 @@
     </message>
     <message>
         <location filename="mainwindow.cpp" line="323"/>
-        <location filename="ui/automatoneditor.cpp" line="114"/>
+        <location filename="ui/automatoneditor.cpp" line="166"/>
         <source>Принять</source>
         <translation>Accept</translation>
     </message>
     <message>
         <location filename="mainwindow.cpp" line="332"/>
-        <location filename="ui/automatoneditor.cpp" line="87"/>
+        <location filename="ui/automatoneditor.cpp" line="139"/>
         <source>Задание варианта</source>
         <translation>Variant task</translation>
     </message>
@@ -231,106 +231,106 @@
         <translation>Mealy → Moore is under development. Select a Moore → Mealy variant.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="50"/>
+        <location filename="ui/automatoneditor.cpp" line="52"/>
         <source>Таблица</source>
         <translation>Table</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="51"/>
+        <location filename="ui/automatoneditor.cpp" line="53"/>
         <source>Матрица</source>
         <translation>Matrix</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="52"/>
+        <location filename="ui/automatoneditor.cpp" line="54"/>
         <source>Граф</source>
         <translation>Graph</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="77"/>
+        <location filename="ui/automatoneditor.cpp" line="129"/>
         <source>Мили: ячейка «следующее состояние / выход1, выход2». Мура: выходы над состояниями. Введите входы x0…x9 слева; «-» означает отсутствие перехода или выхода.</source>
         <translation>Mealy: enter “next state / output1, output2”. Moore: outputs are above the states. Enter inputs x0…x9 on the left; “-” means no transition or output.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="81"/>
+        <location filename="ui/automatoneditor.cpp" line="133"/>
         <source>Принять таблицу</source>
         <translation>Accept table</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="104"/>
+        <location filename="ui/automatoneditor.cpp" line="156"/>
         <source>Очистить матрицу</source>
         <translation>Clear matrix</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="113"/>
+        <location filename="ui/automatoneditor.cpp" line="165"/>
         <source>Размерность матрицы</source>
         <translation>Matrix dimension</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="117"/>
+        <location filename="ui/automatoneditor.cpp" line="169"/>
         <source>Размерность:</source>
         <translation>Dimensions:</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="137"/>
-        <location filename="ui/automatoneditor.cpp" line="908"/>
+        <location filename="ui/automatoneditor.cpp" line="189"/>
+        <location filename="ui/automatoneditor.cpp" line="960"/>
         <source>Состояние</source>
         <translation>State</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="137"/>
-        <location filename="ui/automatoneditor.cpp" line="283"/>
-        <location filename="ui/automatoneditor.cpp" line="904"/>
-        <location filename="ui/automatoneditor.cpp" line="908"/>
+        <location filename="ui/automatoneditor.cpp" line="189"/>
+        <location filename="ui/automatoneditor.cpp" line="335"/>
+        <location filename="ui/automatoneditor.cpp" line="956"/>
+        <location filename="ui/automatoneditor.cpp" line="960"/>
         <source>Выходные сигналы</source>
         <translation>Output signals</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="149"/>
+        <location filename="ui/automatoneditor.cpp" line="201"/>
         <source>В каждой ячейке укажите метки дуг через «;». Для Мили: «вход / выход1,выход2»; для Мура: «x1, x2». Строка — откуда, столбец — куда. Выходы Мура заполните в таблице справа.</source>
         <translation>Separate multiple edge labels with “;”. Mealy: “input / output1,output2”; Moore: “x1, x2”. Rows are source states, columns are destinations. Enter Moore outputs in the table on the right.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="153"/>
+        <location filename="ui/automatoneditor.cpp" line="205"/>
         <source>Принять матрицу</source>
         <translation>Accept matrix</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="166"/>
-        <location filename="ui/automatoneditor.cpp" line="221"/>
+        <location filename="ui/automatoneditor.cpp" line="218"/>
+        <location filename="ui/automatoneditor.cpp" line="273"/>
         <source>Принятая таблица автомата</source>
         <translation>Accepted automaton table</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="183"/>
+        <location filename="ui/automatoneditor.cpp" line="235"/>
         <source>Создать вершину</source>
         <translation>Create vertex</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="185"/>
+        <location filename="ui/automatoneditor.cpp" line="237"/>
         <source>Удалить последнюю вершину</source>
         <translation>Delete last vertex</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="205"/>
+        <location filename="ui/automatoneditor.cpp" line="257"/>
         <source>Двойной щелчок изменяет выходы вершины Мура или подпись дуги. Выберите исходную вершину, затем удерживайте Ctrl и щёлкните по конечной вершине — появится дуга. Backspace/Delete удаляет последнюю вершину (выбранную дугу можно удалить отдельно).</source>
         <translation>Double-click to edit Moore vertex outputs or an edge label. Select a source vertex, then Ctrl-click a destination vertex to create an edge. Backspace/Delete removes the last vertex (a selected edge can be deleted separately).</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="210"/>
+        <location filename="ui/automatoneditor.cpp" line="262"/>
         <source>Принять граф</source>
         <translation>Accept graph</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="280"/>
-        <location filename="ui/automatoneditor.cpp" line="293"/>
-        <location filename="ui/automatoneditor.cpp" line="902"/>
-        <location filename="ui/automatoneditor.cpp" line="906"/>
+        <location filename="ui/automatoneditor.cpp" line="332"/>
+        <location filename="ui/automatoneditor.cpp" line="345"/>
+        <location filename="ui/automatoneditor.cpp" line="954"/>
+        <location filename="ui/automatoneditor.cpp" line="958"/>
         <source>Входные сигналы</source>
         <translation>Input signals</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="287"/>
-        <location filename="ui/automatoneditor.cpp" line="905"/>
+        <location filename="ui/automatoneditor.cpp" line="339"/>
+        <location filename="ui/automatoneditor.cpp" line="957"/>
         <source>Состояния</source>
         <translation>States</translation>
     </message>
@@ -345,66 +345,114 @@
         <translation>Outputs: y0…y9 separated by commas, or -</translation>
     </message>
     <message>
-        <location filename="ui/widgets/hintsplitter.cpp" line="15"/>
+        <location filename="ui/widgets/hintsplitter.cpp" line="16"/>
         <source>Размер подсказки</source>
         <translation>Hint size</translation>
     </message>
     <message>
-        <location filename="ui/widgets/hintsplitter.cpp" line="16"/>
+        <location filename="ui/widgets/hintsplitter.cpp" line="17"/>
         <source>Потяните границу, чтобы изменить размер подсказки. Продолжите движение за упор, чтобы скрыть её. Потяните обратно или дважды щёлкните, чтобы раскрыть.</source>
         <translation>Drag the divider to resize the hint. Continue past the minimum stop to collapse it. Drag back or double-click to expand.</translation>
     </message>
 </context>
 <context>
+    <name>AutomatonEditor</name>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="64"/>
+        <source>Один входной сигнал: x0, x1, …, x9. Например: x0. Перечисления не допускаются.</source>
+        <translation>One input signal: x0, x1, …, x9. Example: x0. Lists are not allowed.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="65"/>
+        <source>Выходные сигналы через запятую: y0 или y0, y2. «-» — нет выхода.</source>
+        <translation>Comma-separated output signals: y0 or y0, y2. Use “-” for no output.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="66"/>
+        <source>Состояния создаются автоматически: a0, a1, …; a0 — начальное. Эта ячейка не редактируется.</source>
+        <translation>States are generated automatically: a0, a1, …; a0 is initial. This cell is read-only.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="69"/>
+        <source>Переход из a%1 в a%2. </source>
+        <translation>Transition from a%1 to a%2. </translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="71"/>
+        <source>Входы на дугах: x0 или x0, x2. «-» — нет перехода.</source>
+        <translation>Edge inputs: x0 or x0, x2. Use “-” for no transition.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="72"/>
+        <source>Метки дуг: x0 / y0, y2; x1 / -. Разделяйте разные входы знаком «;». «-» — нет перехода.</source>
+        <translation>Edge labels: x0 / y0, y2; x1 / -. Separate different inputs with “;”. Use “-” for no transition.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="80"/>
+        <source>Одно следующее состояние, например a0. Используйте только состояния из заголовка. «-» — нет перехода.</source>
+        <translation>One destination state, for example a0. Use only states from the header. Use “-” for no transition.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="82"/>
+        <source>Следующее состояние / выходы: a0 / y0, y2 или a0 / -. Слева — одно состояние, справа — выходы через запятую. «-/-» — нет перехода.</source>
+        <translation>Destination state / outputs: a0 / y0, y2 or a0 / -. Enter one state on the left and comma-separated outputs on the right. Use “-/-” for no transition.</translation>
+    </message>
+    <message>
+        <location filename="ui/automatoneditor.cpp" line="84"/>
+        <source>Принятая таблица: только для просмотра.</source>
+        <translation>Accepted table: read-only.</translation>
+    </message>
+</context>
+<context>
     <name>AutomatonGraphEditor</name>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="428"/>
+        <location filename="ui/automatongrapheditor.cpp" line="435"/>
         <source>Выходы состояния %1</source>
         <translation>Outputs of state %1</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="429"/>
+        <location filename="ui/automatongrapheditor.cpp" line="436"/>
         <source>Выходы y0…y9 через запятую, либо «-»:</source>
         <translation>Outputs y0…y9 separated by commas, or “-”:</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="440"/>
+        <location filename="ui/automatongrapheditor.cpp" line="447"/>
         <source>Вход / выходы; например x1 / y1 или x1 / -; x2 / y2</source>
         <translation>Input / outputs; for example x1 / y1 or x1 / -; x2 / y2</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="441"/>
+        <location filename="ui/automatongrapheditor.cpp" line="448"/>
         <source>Входы через запятую, например x1, x2</source>
         <translation>Inputs separated by commas, for example x1, x2</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="442"/>
+        <location filename="ui/automatongrapheditor.cpp" line="449"/>
         <source>Подпись дуги</source>
         <translation>Edge label</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="573"/>
+        <location filename="ui/automatongrapheditor.cpp" line="584"/>
         <source>Повреждены данные графического редактора.</source>
         <translation>The graph editor data is corrupted.</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="574"/>
+        <location filename="ui/automatongrapheditor.cpp" line="585"/>
         <source>Допускается не более 10 вершин.</source>
         <translation>No more than 10 vertices are allowed.</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="578"/>
-        <location filename="ui/automatongrapheditor.cpp" line="583"/>
+        <location filename="ui/automatongrapheditor.cpp" line="589"/>
+        <location filename="ui/automatongrapheditor.cpp" line="594"/>
         <source>Повреждена вершина сохранённого графа.</source>
         <translation>A vertex in the saved graph is corrupted.</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="594"/>
+        <location filename="ui/automatongrapheditor.cpp" line="605"/>
         <source>Повреждена дуга сохранённого графа.</source>
         <translation>An edge in the saved graph is corrupted.</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="599"/>
+        <location filename="ui/automatongrapheditor.cpp" line="610"/>
         <source>Дуга сохранённого графа ссылается на неизвестную вершину.</source>
         <translation>An edge in the saved graph refers to an unknown vertex.</translation>
     </message>
@@ -647,12 +695,12 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="417"/>
+        <location filename="ui/automatongrapheditor.cpp" line="424"/>
         <source>Принять</source>
         <translation>Accept</translation>
     </message>
     <message>
-        <location filename="ui/automatongrapheditor.cpp" line="418"/>
+        <location filename="ui/automatongrapheditor.cpp" line="425"/>
         <source>Отмена</source>
         <translation>Cancel</translation>
     </message>
@@ -734,13 +782,13 @@
     <name>Result</name>
     <message>
         <location filename="mainwindow.cpp" line="95"/>
-        <location filename="tests/gui_smoke.cpp" line="384"/>
+        <location filename="tests/gui_smoke.cpp" line="417"/>
         <source>Приложение запущено.</source>
         <translation>Application started.</translation>
     </message>
     <message>
         <location filename="mainwindow.cpp" line="421"/>
-        <location filename="tests/gui_smoke.cpp" line="385"/>
+        <location filename="tests/gui_smoke.cpp" line="418"/>
         <source>В BazaVar нет вариантов.</source>
         <translation>BazaVar contains no variants.</translation>
     </message>
@@ -792,14 +840,14 @@
     <message>
         <location filename="domain/automaton.cpp" line="55"/>
         <location filename="domain/reactionchecker.cpp" line="26"/>
-        <location filename="ui/automatoneditor.cpp" line="750"/>
+        <location filename="ui/automatoneditor.cpp" line="802"/>
         <source>Мили</source>
         <translation>Mealy</translation>
     </message>
     <message>
         <location filename="domain/automaton.cpp" line="56"/>
         <location filename="domain/reactionchecker.cpp" line="26"/>
-        <location filename="ui/automatoneditor.cpp" line="750"/>
+        <location filename="ui/automatoneditor.cpp" line="802"/>
         <source>Мура</source>
         <translation>Moore</translation>
     </message>
@@ -905,7 +953,7 @@
     </message>
     <message>
         <location filename="domain/reactionchecker.cpp" line="55"/>
-        <location filename="tests/gui_smoke.cpp" line="383"/>
+        <location filename="tests/gui_smoke.cpp" line="416"/>
         <source>Такт %1: не задан вход %2.</source>
         <translation>Step %1: input %2 is not defined.</translation>
     </message>
@@ -1118,152 +1166,152 @@
         <translation>Could not read the archive.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="329"/>
+        <location filename="ui/automatoneditor.cpp" line="381"/>
         <source>Заполните входные сигналы слева: разные x0…x9.</source>
         <translation>Enter distinct input signals x0…x9 in the left column.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="341"/>
+        <location filename="ui/automatoneditor.cpp" line="393"/>
         <source>Выходы состояний: введите y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>State outputs: enter y0…y9 separated by commas, without duplicates, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="355"/>
+        <location filename="ui/automatoneditor.cpp" line="407"/>
         <source>Для перехода Мили укажите «состояние / выход». </source>
         <translation>For a Mealy transition, enter “state / output”. </translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="362"/>
+        <location filename="ui/automatoneditor.cpp" line="414"/>
         <source>Без следующего состояния выходы не задаются. Для отсутствия перехода используйте -/-.</source>
         <translation>Outputs require a destination state. Use -/- for no transition.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="368"/>
+        <location filename="ui/automatoneditor.cpp" line="420"/>
         <source>Переход ссылается на неизвестное состояние «%1».</source>
         <translation>A transition refers to unknown state “%1”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="376"/>
+        <location filename="ui/automatoneditor.cpp" line="428"/>
         <source>Выходы перехода: введите y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Transition outputs: enter y0…y9 separated by commas, without duplicates, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="462"/>
+        <location filename="ui/automatoneditor.cpp" line="514"/>
         <source>Введите размерность матрицы одним положительным целым числом.</source>
         <translation>Enter the matrix dimension as a single positive integer.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="467"/>
+        <location filename="ui/automatoneditor.cpp" line="519"/>
         <source>Размерность матрицы должна совпадать с числом состояний принятой таблицы: %1.</source>
         <translation>The matrix dimension must match the number of states in the accepted table: %1.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="472"/>
+        <location filename="ui/automatoneditor.cpp" line="524"/>
         <source>Матрица слишком велика для редактора (более 250 000 ячеек).</source>
         <translation>The matrix is too large for the editor (over 250,000 cells).</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="525"/>
+        <location filename="ui/automatoneditor.cpp" line="577"/>
         <source>Сначала создайте матрицу правильной размерности.</source>
         <translation>Create a matrix with the correct dimensions first.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="534"/>
+        <location filename="ui/automatoneditor.cpp" line="586"/>
         <source>Выходы состояния %1: нужны y0…y9 через запятую или «-».</source>
         <translation>Outputs of state %1: enter y0…y9 separated by commas, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="552"/>
+        <location filename="ui/automatoneditor.cpp" line="604"/>
         <source>Метка дуги Мили должна иметь вид «вход / выход».</source>
         <translation>A Mealy edge label must have the form “input / output”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="560"/>
+        <location filename="ui/automatoneditor.cpp" line="612"/>
         <source>Матрица содержит неизвестный вход «%1».</source>
         <translation>The matrix contains unknown input “%1”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="565"/>
+        <location filename="ui/automatoneditor.cpp" line="617"/>
         <source>Для одной пары состояние-вход задано несколько дуг.</source>
         <translation>Multiple edges are defined for one state/input pair.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="574"/>
+        <location filename="ui/automatoneditor.cpp" line="626"/>
         <source>Выходы в матрице: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Matrix outputs: enter y0…y9 separated by commas, without duplicates, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="628"/>
+        <location filename="ui/automatoneditor.cpp" line="680"/>
         <source>Вершина автомата Мура должна иметь подпись «состояние / выходы».</source>
         <translation>A Moore vertex must have the label “state / outputs”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="636"/>
+        <location filename="ui/automatoneditor.cpp" line="688"/>
         <source>Вершина содержит неизвестное состояние «%1».</source>
         <translation>A vertex contains unknown state “%1”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="640"/>
+        <location filename="ui/automatoneditor.cpp" line="692"/>
         <source>Состояние «%1» представлено несколькими вершинами.</source>
         <translation>State “%1” is represented by multiple vertices.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="649"/>
+        <location filename="ui/automatoneditor.cpp" line="701"/>
         <source>Выходы вершины «%1»: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Outputs of vertex “%1”: enter y0…y9 separated by commas, without duplicates, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="655"/>
+        <location filename="ui/automatoneditor.cpp" line="707"/>
         <source>На графе представлены не все состояния автомата.</source>
         <translation>The graph does not represent all states.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="662"/>
+        <location filename="ui/automatoneditor.cpp" line="714"/>
         <source>Дуга ссылается на неизвестную вершину.</source>
         <translation>An edge refers to an unknown vertex.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="668"/>
+        <location filename="ui/automatoneditor.cpp" line="720"/>
         <source>У каждой дуги должна быть подпись.</source>
         <translation>Every edge must have a label.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="677"/>
+        <location filename="ui/automatoneditor.cpp" line="729"/>
         <source>Дуга Мили должна иметь подпись «вход / выходы».</source>
         <translation>A Mealy edge must have the label “input / outputs”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="683"/>
+        <location filename="ui/automatoneditor.cpp" line="735"/>
         <source>На дуге автомата Мура указывается только вход.</source>
         <translation>A Moore edge must contain only input labels.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="688"/>
+        <location filename="ui/automatoneditor.cpp" line="740"/>
         <source>Дуга содержит неизвестный вход «%1».</source>
         <translation>An edge contains unknown input “%1”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="697"/>
+        <location filename="ui/automatoneditor.cpp" line="749"/>
         <source>Выходы дуги: нужны y0…y9 через запятую, без повторов, либо «-».</source>
         <translation>Edge outputs: enter y0…y9 separated by commas, without duplicates, or “-”.</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="751"/>
+        <location filename="ui/automatoneditor.cpp" line="803"/>
         <source>Таблица</source>
         <translation>Table</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="751"/>
+        <location filename="ui/automatoneditor.cpp" line="803"/>
         <source>Матрица</source>
         <translation>Matrix</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="751"/>
+        <location filename="ui/automatoneditor.cpp" line="803"/>
         <source>Граф</source>
         <translation>Graph</translation>
     </message>
     <message>
-        <location filename="ui/automatoneditor.cpp" line="752"/>
+        <location filename="ui/automatoneditor.cpp" line="804"/>
         <source>%1 — %2</source>
         <translation>%1 — %2</translation>
     </message>

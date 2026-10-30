@@ -11,6 +11,7 @@
 #include "mainwindow.h"
 #include "ui/automatongrapheditor.h"
 #include "ui/automatoneditor.h"
+#include "ui/appicons.h"
 #include "ui/contraststyle.h"
 #include "ui/mealycelldelegate.h"
 #include "ui/widgets/taskimage.h"
@@ -25,6 +26,10 @@
 #include <QGraphicsScene>
 #include <QGraphicsItem>
 #include <QMouseEvent>
+#include <QHelpEvent>
+#include <QToolTip>
+#include <QMenuBar>
+#include <QVBoxLayout>
 
 #include <QApplication>
 #include <QLabel>
@@ -94,6 +99,16 @@ struct MainWindowTestAccess {
     }
 };
 
+QString hoverHelp(QTableWidget* table, int row, int col) {
+    QApplication::processEvents();
+    const auto point = table->visualItemRect(table->item(row, col)).center();
+    QHelpEvent event(QEvent::ToolTip, point, table->viewport()->mapToGlobal(point));
+    QApplication::sendEvent(table->viewport(), &event);
+    const auto text = QToolTip::text();
+    QToolTip::hideText();
+    return text;
+}
+
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     window.activateWindow(); window.raise(); QApplication::processEvents();
     QTemporaryDir temporary;
@@ -142,6 +157,12 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         !(table->item(3, 1)->flags() & Qt::ItemIsEditable) &&
         table->item(4, 0)->text().isEmpty() && table->item(4, 1)->text() == "-",
         "table auto-generates canonical header, blank input and absent transitions");
+    const auto answersBeforeHelp = source->answerData();
+    require(hoverHelp(table, 4, 0).contains("Один входной сигнал") &&
+        hoverHelp(table, 1, 1).contains("y0, y2") &&
+        hoverHelp(table, 4, 1).contains("Одно следующее состояние"),
+        "Moore cells show examples for inputs, outputs and destination states");
+    require(source->answerData() == answersBeforeHelp, "hovering never changes answers");
     table->editItem(table->item(4, 0)); QApplication::processEvents();
     auto* freeInput = table->findChild<QLineEdit*>();
     require(freeInput && !freeInput->validator(), "Moore input has no typing validator");
@@ -188,6 +209,10 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
             restoredEditor->findChild<QLineEdit*>("matrixDimensionEdit")->text() == "2", "restoring does not auto-build an unfinished matrix");
     }
     dimension->setText("1"); build->click();
+    require(hoverHelp(matrix, 0, 0).contains("x0, x2") && hoverHelp(outputs, 0, 1).contains("y0, y2"),
+        "Moore matrices show separate edge-input and output examples");
+    require(hoverHelp(source->findChild<QTableWidget*>("matrixReference"), 4, 1).contains("только для просмотра"),
+        "accepted reference table explains that its cells are read-only");
     require(matrix->item(0, 0)->text() == "-", "matrix defaults to no transitions");
     outputs->item(0, 1)->setText("y4");
     build->click();
@@ -240,6 +265,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* t = target->findChild<QTableWidget*>("transitionTable");
     require(t->item(2, 1)->text() == "-/-", "Mealy transitions default to -/-");
     workflow->setCurrentIndex(2); QApplication::processEvents();
+    require(hoverHelp(t, 2, 1).contains("a0 / y0, y2") && hoverHelp(t, 2, 1).contains("-/-"),
+        "Mealy table explains both sides and the absent transition format");
     t->item(2, 0)->setText("x9");
     t->editItem(t->item(2, 1)); QApplication::processEvents();
     auto activeEditor = [t]() -> QWidget* {
@@ -287,6 +314,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(target->findChild<QTableWidget*>("transitionMatrix")->rowCount() == 0, "Mealy matrix also waits for a dimension");
     target->findChild<QLineEdit*>("matrixDimensionEdit")->setText("1");
     target->findChild<QPushButton*>("configureMatrixButton")->click();
+    require(hoverHelp(target->findChild<QTableWidget*>("transitionMatrix"), 0, 0).contains("x0 / y0, y2; x1 / -"),
+        "Mealy matrix shows semicolon-separated edge examples");
     target->findChild<QTableWidget*>("transitionMatrix")->item(0, 0)->setText("x9/y4");
     target->findChild<QPushButton*>("acceptMatrixButton")->click();
     auto* g = target->findChild<AutomatonGraphEditor*>(); g->createVertex();
@@ -306,6 +335,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* log = window.findChild<LogWindow*>("eventLogWindow");
     require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
     english->trigger(); QApplication::processEvents();
+    require(hoverHelp(target->findChild<QTableWidget*>("graphReference"), 2, 1).contains("read-only"),
+        "cell hints follow a live language switch");
     require(!MainWindowTestAccess::dirty(window), "translated generated table headings do not create unsaved changes");
     if (!screenshot.isEmpty()) {
         window.grab().save(screenshot + ".english.png");
@@ -542,6 +573,62 @@ void testHintDrag() {
     QTest::keyClick(handle, Qt::Key_Return); require(splitter.expanded(), "keyboard can restore hint");
 }
 
+void testMenuColorsAndDividerGaps() {
+    QMenuBar menu;
+    menu.setNativeMenuBar(false);
+    AppIcons::configureMenuBar(&menu);
+    auto* file = menu.addMenu(AppIcons::icon(AppIcons::Kind::File), "File");
+    menu.resize(320, 40); menu.show();
+    for (const auto& text : {QColor(15, 85, 140), QColor(220, 235, 190)}) {
+        auto colors = menu.palette();
+        colors.setColor(QPalette::WindowText, text);
+        colors.setColor(QPalette::ButtonText, QColor(175, 35, 90));
+        menu.setPalette(colors); QApplication::processEvents();
+        const auto image = menu.grab().toImage();
+        auto caption = menu.actionGeometry(file->menuAction()).adjusted(26, 0, 0, 0);
+        const auto area = QRect(qRound(caption.x() * image.devicePixelRatio()), qRound(caption.y() * image.devicePixelRatio()),
+            qRound(caption.width() * image.devicePixelRatio()), qRound(caption.height() * image.devicePixelRatio())).intersected(image.rect());
+        int matching = 0;
+        for (int y = area.top(); y <= area.bottom(); ++y)
+            for (int x = area.left(); x <= area.right(); ++x) {
+                const auto pixel = image.pixelColor(x, y);
+                if (qAbs(pixel.red() - text.red()) < 18 && qAbs(pixel.green() - text.green()) < 18 && qAbs(pixel.blue() - text.blue()) < 18)
+                    ++matching;
+            }
+        require(matching > 4, "menu captions repaint using the current WindowText color");
+    }
+    for (const auto orientation : {Qt::Vertical, Qt::Horizontal}) {
+        for (const auto& background : {QColor(42, 44, 47), QColor(245, 245, 245)}) {
+            QWidget page; page.setAutoFillBackground(true);
+            auto palette = page.palette(); palette.setColor(QPalette::Window, background);
+            palette.setColor(QPalette::WindowText, background.lightness() > 128 ? Qt::black : Qt::white);
+            page.setPalette(palette);
+            auto* layout = new QVBoxLayout(&page);
+            auto* split = new HintSplitter("Hint", new QWidget, new QWidget, "gapTest", orientation);
+            layout->addWidget(split); page.resize(600, 400); page.show(); QApplication::processEvents();
+            auto* handle = split->handle(1);
+            const auto image = handle->grab().toImage();
+            auto pixel = [&](QPoint point) {
+                return image.pixelColor(qFloor((point.x() + 0.5) * image.devicePixelRatio()),
+                    qFloor((point.y() + 0.5) * image.devicePixelRatio()));
+            };
+            const auto before = orientation == Qt::Vertical ? QPoint(60, 2) : QPoint(2, 60);
+            const auto after = orientation == Qt::Vertical ? QPoint(60, handle->height() - 3) : QPoint(handle->width() - 3, 60);
+            const auto track = orientation == Qt::Vertical ? QPoint(60, handle->rect().center().y()) : QPoint(handle->rect().center().x(), 60);
+            require(pixel(before) == background && pixel(after) == background, "divider leaves genuine page-colored gaps on both sides");
+            // A one-pixel line can land between logical pixels at fractional DPI.
+            const int tx = qRound(track.x() * image.devicePixelRatio());
+            const int ty = qRound(track.y() * image.devicePixelRatio());
+            bool visibleTrack = false;
+            for (int offset = -2; offset <= 2; ++offset) {
+                const auto point = orientation == Qt::Vertical ? QPoint(tx, ty + offset) : QPoint(tx + offset, ty);
+                if (image.rect().contains(point)) visibleTrack |= image.pixelColor(point) != background;
+            }
+            require(visibleTrack, "thin divider remains visible between the gaps");
+        }
+    }
+}
+
 void testImages() {
     QImage source(1200, 300, QImage::Format_RGB32); source.fill(Qt::red);
     QByteArray bytes; QBuffer buffer(&bytes); buffer.open(QIODevice::WriteOnly); source.save(&buffer, "PNG");
@@ -749,6 +836,7 @@ int main(int argc, char** argv) {
     testUnsavedChanges();
     testJournal();
     testHintDrag();
+    testMenuColorsAndDividerGaps();
     testImages();
     testValidationAndFeedback();
     std::cout << "PASS GUI startup, workflow gates and interactive graph editor\n";

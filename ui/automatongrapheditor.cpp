@@ -53,7 +53,8 @@ public:
           m_owner(owner), m_id(id), m_label(label),
           m_text(new QGraphicsSimpleTextItem(this)) {
         setFlags(ItemIsMovable | ItemIsSelectable | ItemSendsGeometryChanges);
-        setCacheMode(DeviceCoordinateCache);
+        // The bounding rectangle must cover the widest pen used by paint().
+        setPen(QPen(Qt::black, 3.0));
         setZValue(2.0);
         m_text->setAcceptedMouseButtons(Qt::NoButton);
         updateText();
@@ -212,6 +213,10 @@ public:
         return stroker.createStroke(path());
     }
 
+    QRectF boundingRect() const override {
+        return path().controlPointRect().adjusted(-8, -8, 8, 8);
+    }
+
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event) override {
         if (event->button() == Qt::LeftButton) {
@@ -283,7 +288,9 @@ AutomatonGraphEditor::AutomatonGraphEditor(QWidget* parent)
     : QGraphicsView(parent), m_scene(new QGraphicsScene(this)) {
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
-    setViewportUpdateMode(BoundingRectViewportUpdate);
+    // At most ten vertices: repainting the small canvas avoids stale raster
+    // fragments from cached items and partial updates during dragging/scrolling.
+    setViewportUpdateMode(FullViewportUpdate);
     setDragMode(RubberBandDrag);
     setResizeAnchor(QGraphicsView::AnchorViewCenter);
     setFocusPolicy(Qt::StrongFocus);
@@ -507,19 +514,23 @@ QRectF AutomatonGraphEditor::workspaceRect() {
 }
 
 void AutomatonGraphEditor::drawBackground(QPainter* painter, const QRectF& exposed) {
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, false);
     const auto base = palette().color(QPalette::Base);
     const auto text = palette().color(QPalette::Text);
     QColor outside = base;
     outside.setRedF(base.redF() * 0.92 + text.redF() * 0.08);
     outside.setGreenF(base.greenF() * 0.92 + text.greenF() * 0.08);
     outside.setBlueF(base.blueF() * 0.92 + text.blueF() * 0.08);
-    painter->fillRect(exposed, outside);
-    painter->fillRect(workspaceRect().intersected(exposed), base);
+    painter->fillRect(exposed.toAlignedRect(), outside);
+    painter->fillRect(workspaceRect().intersected(exposed.toAlignedRect()), base);
+    painter->setRenderHint(QPainter::Antialiasing);
     QPen border(text, 1.5, Qt::DashLine);
     border.setCosmetic(true);
     painter->setPen(border);
     painter->setBrush(Qt::NoBrush);
     painter->drawRect(workspaceRect());
+    painter->restore();
 }
 
 QVector<GraphVertexData> AutomatonGraphEditor::vertices() const {

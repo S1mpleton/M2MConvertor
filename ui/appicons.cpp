@@ -9,7 +9,8 @@
 
 namespace {
 // QMenuBar's standard painting replaces a title with its icon. Reserve room
-// for both while leaving menu colors and selection rendering to the OS style.
+// for both while leaving selection rendering to the OS style. Draw captions
+// with the live widget palette: native menu styles may cache their theme colors.
 class MenuStyle final : public QProxyStyle {
   public:
     QSize sizeFromContents(ContentsType type, const QStyleOption *option, const QSize &size,
@@ -33,8 +34,18 @@ class MenuStyle final : public QProxyStyle {
             QProxyStyle::drawControl(element, &background, painter, widget);
             auto textItem = *item;
             textItem.icon = QIcon();
-            textItem.rect.adjust(22, 0, 0, 0);
-            QProxyStyle::drawControl(element, &textItem, painter, widget);
+            textItem.rect.adjust(26, 0, -4, 0);
+            const auto colors = widget ? widget->palette() : textItem.palette;
+            const bool enabled = textItem.state.testFlag(State_Enabled);
+            painter->save();
+            painter->setFont(textItem.font);
+            painter->setPen(colors.color(enabled ? QPalette::Active : QPalette::Disabled,
+                                         QPalette::WindowText));
+            int flags = Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine | Qt::TextShowMnemonic;
+            if (!styleHint(SH_UnderlineShortcut, &textItem, widget))
+                flags |= Qt::TextHideMnemonic;
+            painter->drawText(textItem.rect, flags, textItem.text);
+            painter->restore();
             item->icon.paint(painter,
                              QRect(item->rect.left() + 5, item->rect.center().y() - 8, 16, 16));
             return;

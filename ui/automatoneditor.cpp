@@ -14,6 +14,7 @@
 #include "ui/workflowtabs.h"
 
 #include <QGroupBox>
+#include <QHelpEvent>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -25,6 +26,7 @@
 #include <QStyle>
 #include <QTableWidget>
 #include <QTabWidget>
+#include <QToolTip>
 #include <QVBoxLayout>
 
 namespace {
@@ -53,6 +55,56 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
     m_tabs->setTabEnabled(1, false);
     m_tabs->setTabEnabled(2, false);
     layout->addWidget(m_tabs);
+    for (auto* table : {m_transitionTable, m_matrixTable, m_matrixOutputs,
+                        m_matrixReference, m_graphReference})
+        table->viewport()->installEventFilter(this);
+}
+
+QString AutomatonEditor::cellHelp(const QTableWidget* table, int row, int column) const {
+    const auto inputs = tr("Один входной сигнал: x0, x1, …, x9. Например: x0. Перечисления не допускаются.");
+    const auto outputs = tr("Выходные сигналы через запятую: y0 или y0, y2. «-» — нет выхода.");
+    const auto states = tr("Состояния создаются автоматически: a0, a1, …; a0 — начальное. Эта ячейка не редактируется.");
+    QString help;
+    if (table == m_matrixTable) {
+        help = tr("Переход из a%1 в a%2. ").arg(row).arg(column);
+        help += m_editorKind == AutomatonKind::Moore
+            ? tr("Входы на дугах: x0 или x0, x2. «-» — нет перехода.")
+            : tr("Метки дуг: x0 / y0, y2; x1 / -. Разделяйте разные входы знаком «;». «-» — нет перехода.");
+    } else if (table == m_matrixOutputs) {
+        help = column == 0 ? states : outputs;
+    } else {
+        if (column == 0) help = inputs;
+        else if (m_editorKind == AutomatonKind::Moore && row <= 1) help = outputs;
+        else if (row < firstInputRow()) help = states;
+        else if (m_editorKind == AutomatonKind::Moore)
+            help = tr("Одно следующее состояние, например a0. Используйте только состояния из заголовка. «-» — нет перехода.");
+        else
+            help = tr("Следующее состояние / выходы: a0 / y0, y2 или a0 / -. Слева — одно состояние, справа — выходы через запятую. «-/-» — нет перехода.");
+        if (table != m_transitionTable)
+            help += "\n" + tr("Принятая таблица: только для просмотра.");
+    }
+    return help;
+}
+
+bool AutomatonEditor::eventFilter(QObject* object, QEvent* event) {
+    if (event->type() == QEvent::ToolTip) {
+        for (auto* table : {m_transitionTable, m_matrixTable, m_matrixOutputs,
+                            m_matrixReference, m_graphReference}) {
+            if (object != table->viewport()) continue;
+            auto* help = static_cast<QHelpEvent*>(event);
+            const auto index = table->indexAt(help->pos());
+            if (index.isValid()) {
+                const auto text = cellHelp(table, index.row(), index.column());
+                QToolTip::showText(help->globalPos(), "<qt>" + text.toHtmlEscaped().replace('\n', "<br>") + "</qt>",
+                                   table->viewport(), table->visualRect(index));
+            } else {
+                QToolTip::hideText();
+                event->ignore();
+            }
+            return true;
+        }
+    }
+    return QWidget::eventFilter(object, event);
 }
 
 QWidget* AutomatonEditor::createTablePage() {

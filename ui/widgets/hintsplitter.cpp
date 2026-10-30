@@ -12,6 +12,7 @@ class HintHandle : public QSplitterHandle {
     HintHandle(Qt::Orientation orientation, HintSplitter* splitter)
         : QSplitterHandle(orientation, splitter), m_owner(splitter) {
         setFocusPolicy(Qt::StrongFocus);
+        setAutoFillBackground(false);
         UiText::bind(this, "accessibleName", QT_TRANSLATE_NOOP("App", "Размер подсказки"));
         UiText::bind(this, "toolTip", QT_TRANSLATE_NOOP("App", "Потяните границу, чтобы изменить размер подсказки. "
                       "Продолжите движение за упор, чтобы скрыть её. "
@@ -19,16 +20,19 @@ class HintHandle : public QSplitterHandle {
     }
 
   protected:
-    void paintEvent(QPaintEvent* event) override {
-        QSplitterHandle::paintEvent(event);
+    void paintEvent(QPaintEvent*) override {
+        // Do not paint the native handle: some themes fill its entire hit area.
+        // The parent page remains visible on both sides of this one-pixel track.
         QPainter painter(this);
-        auto bar = rect();
-        // Leave clear space on each side, rather than joining the hint frame or toolbar.
-        if (orientation() == Qt::Vertical) bar.adjust(0, 7, 0, -7);
-        else bar.adjust(7, 0, -7, 0);
-        painter.fillRect(bar, palette().brush(QPalette::Dark));
-        painter.setPen(palette().color(hasFocus() ? QPalette::Highlight : QPalette::Mid));
         const auto c = rect().center();
+        auto track = palette().color(QPalette::WindowText);
+        track.setAlpha(80);
+        painter.setPen(track);
+        if (orientation() == Qt::Vertical)
+            painter.drawLine(0, c.y(), width() - 1, c.y());
+        else
+            painter.drawLine(c.x(), 0, c.x(), height() - 1);
+        painter.setPen(palette().color(hasFocus() ? QPalette::Highlight : QPalette::WindowText));
         for (int offset : {-2, 1}) {
             if (orientation() == Qt::Vertical)
                 painter.drawLine(c.x() - 18, c.y() + offset, c.x() + 18, c.y() + offset);
