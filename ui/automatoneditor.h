@@ -27,6 +27,7 @@ public:
     bool completed() const { return m_graphAccepted; }
     Automaton acceptedAutomaton() const { return m_graphAutomaton; }
     QJsonObject toJson() const;
+    QJsonObject answerData() const;
     void fromJson(const QJsonObject& object);
 
 signals:

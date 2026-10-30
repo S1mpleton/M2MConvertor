@@ -2,6 +2,8 @@
 #include "infrastructure/translationmanager.h"
 #include "ui/logwindow.h"
 #include <QActionGroup>
+#include <QApplication>
+#include <QCloseEvent>
 #include <QEvent>
 #include <QSignalBlocker>
 #include "ui/uitext.h"
@@ -461,6 +463,7 @@ void MainWindow::updateVariantSelection(int index) {
 void MainWindow::beginWork() {
     const int index = m_variantCombo->currentIndex();
     if (index < 0 || index >= m_variants.size()) return;
+    if (!confirmUnsavedChanges()) return;
     if (!setupWorkspace(m_variants[index])) return;
     m_progressPath.clear();
     m_pages->setCurrentIndex(kWorkspacePage);
@@ -493,6 +496,7 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     m_saveAction->setEnabled(true);
     m_saveAsAction->setEnabled(true);
     updateWorkflowState();
+    m_savedWorkState = workSnapshot();
     return true;
 }
 
@@ -543,12 +547,7 @@ void MainWindow::updateWorkflowState() {
 }
 
 void MainWindow::returnToLanding() {
-    if (m_pages->currentIndex() == kWorkspacePage && m_hasVariant) {
-        const auto answer = QMessageBox::question(
-            this, tr("Завершить текущую работу?"),
-            tr("Несохранённые данные текущей работы будут потеряны. Продолжить?"));
-        if (answer != QMessageBox::Yes) return;
-    }
+    if (!confirmUnsavedChanges()) return;
     Logger::instance().log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Возврат к выбору варианта.")), ResultCategory::Progress));
     m_pages->setCurrentIndex(kLandingPage);
     m_hasVariant = false;
@@ -575,22 +574,69 @@ QJsonObject MainWindow::progressData() const {
     return data;
 }
 
-void MainWindow::saveProgress(bool saveAs) {
-    if (!m_hasVariant) return;
+QJsonObject MainWindow::workSnapshot() const {
+    auto data = progressData();
+    data.insert("source", m_sourceEditor->answerData());
+    data.insert("target", m_targetEditor->answerData());
+    return data;
+}
+
+void MainWindow::commitPendingInput() {
+    if (auto* focus = QApplication::focusWidget())
+        if (m_sourceEditor->isAncestorOf(focus) || m_targetEditor->isAncestorOf(focus))
+            m_workflowTabs->setFocus();
+    for (auto* count : {m_stateCount, m_inputCount, m_outputCount}) count->interpretText();
+}
+
+bool MainWindow::hasUnsavedChanges() const {
+    return m_hasVariant && workSnapshot() != m_savedWorkState;
+}
+
+bool MainWindow::confirmUnsavedChanges() {
+    commitPendingInput();
+    if (!hasUnsavedChanges()) return true;
+    QMessageBox box(QMessageBox::Warning, tr("Несохранённые изменения"),
+        tr("В работе есть несохранённые изменения. Сохранить их перед продолжением?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+    box.setObjectName("unsavedChangesDialog");
+    box.setInformativeText(tr("Если продолжить без сохранения, изменения будут потеряны."));
+    box.button(QMessageBox::Save)->setText(tr("Сохранить"));
+    box.button(QMessageBox::Discard)->setText(tr("Не сохранять"));
+    box.button(QMessageBox::Cancel)->setText(tr("Отмена"));
+    box.setDefaultButton(QMessageBox::Save);
+    box.setEscapeButton(QMessageBox::Cancel);
+    switch (box.exec()) {
+    case QMessageBox::Save: return saveProgress();
+    case QMessageBox::Discard: return true;
+    default: return false;
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    if (confirmUnsavedChanges()) QMainWindow::closeEvent(event);
+    else event->ignore();
+}
+
+bool MainWindow::saveProgress(bool saveAs) {
+    if (!m_hasVariant) return false;
+    commitPendingInput();
     QString path = m_progressPath;
     if (saveAs || path.isEmpty()) {
         path = QFileDialog::getSaveFileName(
             this, tr("Сохранить учебную работу"),
             tr("variant-%1.m2mwork").arg(m_currentVariant.number),
             tr("Работа M2MConvertor (*.m2mwork)"));
-        if (path.isEmpty()) return;
+        if (path.isEmpty()) return false;
         if (!path.endsWith(QStringLiteral(".m2mwork"), Qt::CaseInsensitive))
             path += QStringLiteral(".m2mwork");
     }
     const auto result = ProgressStore::write(path, progressData());
     showResult(result);
-    if (result.ok()) m_progressPath = path;
-
+    if (result.ok()) {
+        m_progressPath = path;
+        m_savedWorkState = workSnapshot();
+    }
+    return result.ok();
 }
 
 void MainWindow::openProgress() {
@@ -630,6 +676,7 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
         showResult(Result::warning(Message(QT_TRANSLATE_NOOP("Result", "Открытие работ Мили → Мура пока недоступно.")), ResultCategory::Progress));
         return false;
     }
+    if (!confirmUnsavedChanges()) return false;
     Logger::instance().log(archiveResult);
     applyArchive(archivePath, variants);
     if (!setupWorkspace(*found)) return false;
@@ -649,6 +696,7 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
     m_recordBook->setText(report.value(QStringLiteral("recordBook")).toString());
     m_progressPath = progressPath;
     updateWorkflowState();
+    m_savedWorkState = workSnapshot();
     return true;
 }
 

@@ -798,6 +798,28 @@ QJsonObject AutomatonEditor::toJson() const {
     return object;
 }
 
+QJsonObject AutomatonEditor::answerData() const {
+    auto object = toJson();
+    object.remove("hints");
+    object.remove("hintExtents");
+    // Generated headings may change with the UI language; only answers count as edits.
+    const auto editableCells = [](const QTableWidget* table) {
+        QJsonArray rows;
+        for (int row = 0; row < table->rowCount(); ++row) {
+            QJsonArray cells;
+            for (int col = 0; col < table->columnCount(); ++col) {
+                const auto* item = table->item(row, col);
+                cells.append(item && (item->flags() & Qt::ItemIsEditable) ? item->text() : QString());
+            }
+            rows.append(cells);
+        }
+        return rows;
+    };
+    object.insert("table", editableCells(m_transitionTable));
+    object.insert("matrixOutputs", editableCells(m_matrixOutputs));
+    return object;
+}
+
 void AutomatonEditor::fromJson(const QJsonObject& object) {
     resetEditor();
     const auto hints = object.value("hints").toObject();

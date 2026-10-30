@@ -28,6 +28,7 @@ class AutomatonGraphEditor : public QGraphicsView {
     Q_OBJECT
 public:
     explicit AutomatonGraphEditor(QWidget* parent = nullptr);
+    static QRectF workspaceRect();
 
     void setTemplate(const Automaton& automaton);
     void clearGraph();
@@ -46,6 +47,7 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void changeEvent(QEvent* event) override;
+    void drawBackground(QPainter* painter, const QRectF& rect) override;
 
 private:
     friend class GraphEdgeItem;
@@ -61,7 +63,6 @@ private:
     void editVertex(GraphVertexItem* vertex);
     void editEdge(GraphEdgeItem* edge);
     void updatePalette();
-    void updateSceneBounds();
     void clearItems();
     QString nextVertexLabel() const;
     QPointF nextVertexPosition() const;

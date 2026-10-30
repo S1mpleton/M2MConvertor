@@ -20,6 +20,7 @@ class QStackedWidget;
 class QTabWidget;
 class QShowEvent;
 class QEvent;
+class QCloseEvent;
 class LogWindow;
 class WorkScrollArea;
 class HintSplitter;
@@ -32,6 +33,7 @@ public:
 protected:
     void showEvent(QShowEvent* event) override;
     void changeEvent(QEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
 
 private:
     friend struct MainWindowTestAccess;
@@ -54,7 +56,11 @@ private:
     bool setupWorkspace(const TrainingVariant& variant);
     void acceptCounts();
     void returnToLanding();
-    void saveProgress(bool saveAs = false);
+    bool saveProgress(bool saveAs = false);
+    void commitPendingInput();
+    bool hasUnsavedChanges() const;
+    bool confirmUnsavedChanges();
+    QJsonObject workSnapshot() const;
     void openProgress();
     bool restoreProgress(const QJsonObject& data, const QString& progressPath);
     QJsonObject progressData() const;
@@ -99,6 +105,7 @@ private:
     TrainingVariant m_currentVariant;
     QString m_archivePath;
     QString m_progressPath;
+    QJsonObject m_savedWorkState;
     bool m_initialSizeApplied = false;
     bool m_workspaceSizeApplied = false;
     bool m_hasVariant = false;

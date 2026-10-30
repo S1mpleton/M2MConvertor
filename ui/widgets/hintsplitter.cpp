@@ -22,7 +22,11 @@ class HintHandle : public QSplitterHandle {
     void paintEvent(QPaintEvent* event) override {
         QSplitterHandle::paintEvent(event);
         QPainter painter(this);
-        painter.fillRect(rect(), palette().brush(QPalette::Dark));
+        auto bar = rect();
+        // Leave clear space on each side, rather than joining the hint frame or toolbar.
+        if (orientation() == Qt::Vertical) bar.adjust(0, 7, 0, -7);
+        else bar.adjust(7, 0, -7, 0);
+        painter.fillRect(bar, palette().brush(QPalette::Dark));
         painter.setPen(palette().color(hasFocus() ? QPalette::Highlight : QPalette::Mid));
         const auto c = rect().center();
         for (int offset : {-2, 1}) {
@@ -56,7 +60,7 @@ HintSplitter::HintSplitter(const char* title, QWidget* hint, QWidget* work, cons
     : QSplitter(orientation, parent) {
     setObjectName(name);
     setContentsMargins(0, 0, 0, 0);
-    setHandleWidth(8);
+    setHandleWidth(20);
     setChildrenCollapsible(false);
     auto* group = UiText::make<QGroupBox>(title);
     group->setObjectName(name + "Content");

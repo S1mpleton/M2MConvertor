@@ -8,6 +8,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSimpleTextItem>
 #include <QInputDialog>
+#include <QFontMetricsF>
 #include <QHash>
 #include <QJsonArray>
 #include <QKeyEvent>
@@ -25,6 +26,14 @@
 
 namespace {
 constexpr qreal kVertexRadius = 34.0;
+constexpr qreal kVertexInset = 80.0;
+
+QPointF boundedPoint(QPointF point, const QRectF& bounds) {
+    if (!std::isfinite(point.x())) point.setX(0);
+    if (!std::isfinite(point.y())) point.setY(0);
+    return {qBound(bounds.left(), point.x(), bounds.right()),
+            qBound(bounds.top(), point.y(), bounds.bottom())};
+}
 
 QPointF normalized(const QPointF& value) {
     const qreal length = std::hypot(value.x(), value.y());
@@ -85,7 +94,9 @@ protected:
 
 private:
     void updateText() {
-        m_text->setText(m_label.isEmpty() ? QStringLiteral("?") : m_label);
+        m_text->setText(QFontMetricsF(m_text->font()).elidedText(
+            m_label.isEmpty() ? QStringLiteral("?") : m_label, Qt::ElideRight, 144));
+        setToolTip(m_label);
         const QRectF bounds = m_text->boundingRect();
         m_text->setPos(-bounds.width() / 2.0, -bounds.height() / 2.0);
     }
@@ -146,26 +157,29 @@ public:
         update();
     }
     void updateGeometry() {
-        prepareGeometryChange();
         QPainterPath curve;
+        const auto controlBounds = AutomatonGraphEditor::workspaceRect().adjusted(60, 60, -60, -60);
         QPointF arrowDirection;
         if (m_from == m_to) {
             QPointF offset = m_controlOffset;
             if (std::hypot(offset.x(), offset.y()) < 30.0)
                 offset = QPointF(0.0, -85.0);
-            const QPointF direction = normalized(offset);
-            const QPointF side(-direction.y(), direction.x());
             const QPointF center = m_from->scenePos();
+            const QPointF farPoint = boundedPoint(center + offset, controlBounds);
+            m_controlOffset = farPoint - center;
+            const QPointF direction = normalized(m_controlOffset);
+            const QPointF side(-direction.y(), direction.x());
             const QPointF start = center + direction * kVertexRadius - side * 15.0;
             const QPointF end = center + direction * kVertexRadius + side * 15.0;
-            const QPointF farPoint = center + offset;
             curve.moveTo(start);
             curve.cubicTo(farPoint - side * 50.0, farPoint + side * 50.0, end);
             arrowDirection = normalized(end - (farPoint + side * 50.0));
         } else {
             const QPointF first = m_from->scenePos();
             const QPointF second = m_to->scenePos();
-            const QPointF control = (first + second) / 2.0 + m_controlOffset;
+            const QPointF middle = (first + second) / 2.0;
+            const QPointF control = boundedPoint(middle + m_controlOffset, controlBounds);
+            m_controlOffset = control - middle;
             const QPointF start = first + normalized(control - first) * kVertexRadius;
             const QPointF end = second - normalized(second - control) * kVertexRadius;
             curve.moveTo(start);
@@ -219,7 +233,6 @@ protected:
             ? m_from->scenePos()
             : (m_from->scenePos() + m_to->scenePos()) / 2.0;
         setControlOffset(event->scenePos() - base);
-        m_owner->updateSceneBounds();
         m_owner->graphChanged();
         event->accept();
     }
@@ -256,9 +269,11 @@ private:
 
 QVariant GraphVertexItem::itemChange(GraphicsItemChange change,
                                      const QVariant& value) {
+    if (change == ItemPositionChange)
+        return boundedPoint(value.toPointF(), AutomatonGraphEditor::workspaceRect().adjusted(
+            kVertexInset, kVertexInset, -kVertexInset, -kVertexInset));
     if (change == ItemPositionHasChanged) {
         for (GraphEdgeItem* edge : std::as_const(m_edges)) edge->updateGeometry();
-        m_owner->updateSceneBounds();
         m_owner->graphChanged();
     }
     return QGraphicsEllipseItem::itemChange(change, value);
@@ -273,7 +288,10 @@ AutomatonGraphEditor::AutomatonGraphEditor(QWidget* parent)
     setResizeAnchor(QGraphicsView::AnchorViewCenter);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumHeight(380);
-    m_scene->setSceneRect(-500, -350, 1000, 700);
+    // Never resize the scene or rebuild a spatial index inside an item move.
+    // This canvas easily holds a 5 × 5 grid of vertices, while editing stays capped at 10.
+    m_scene->setItemIndexMethod(QGraphicsScene::NoIndex);
+    m_scene->setSceneRect(workspaceRect().adjusted(-40, -40, 40, 40));
     updatePalette();
 }
 
@@ -316,7 +334,6 @@ void AutomatonGraphEditor::createVertex() {
     m_scene->clearSelection();
     vertex->setSelected(true);
     updatePalette();
-    updateSceneBounds();
     centerOn(vertex);
     setFocus();
     emit graphChanged();
@@ -372,7 +389,6 @@ void AutomatonGraphEditor::removeEdge(GraphEdgeItem* edge) {
     m_edges.removeAll(edge);
     m_scene->removeItem(edge);
     delete edge;
-    updateSceneBounds();
     emit graphChanged();
 }
 
@@ -384,7 +400,6 @@ void AutomatonGraphEditor::removeVertex(GraphVertexItem* vertex) {
     m_vertices.removeAll(vertex);
     m_scene->removeItem(vertex);
     delete vertex;
-    updateSceneBounds();
     emit graphChanged();
 }
 
@@ -415,7 +430,6 @@ void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
         vertex->label().section('/', 1).trimmed(), &accepted);
     if (accepted) {
         vertex->setLabel(state + QStringLiteral(" / ") + (value.trimmed().isEmpty() ? QStringLiteral("-") : value));
-            updateSceneBounds();
         emit graphChanged();
     }
 }
@@ -429,7 +443,6 @@ void AutomatonGraphEditor::editEdge(GraphEdgeItem* edge) {
         edge->label(), &accepted);
     if (accepted) {
         edge->setLabel(value.trimmed().isEmpty() ? QStringLiteral("-") : value);
-        updateSceneBounds();
         emit graphChanged();
     }
 }
@@ -489,11 +502,24 @@ void AutomatonGraphEditor::updatePalette() {
         edge->setColors(text, text, background);
 }
 
-void AutomatonGraphEditor::updateSceneBounds() {
-    QRectF bounds = m_scene->itemsBoundingRect().adjusted(-140, -140, 140, 140);
-    const QRectF minimum(-500, -350, 1000, 700);
-    if (bounds.isEmpty()) bounds = minimum;
-    m_scene->setSceneRect(bounds.united(minimum));
+QRectF AutomatonGraphEditor::workspaceRect() {
+    return {-800, -600, 1600, 1200};
+}
+
+void AutomatonGraphEditor::drawBackground(QPainter* painter, const QRectF& exposed) {
+    const auto base = palette().color(QPalette::Base);
+    const auto text = palette().color(QPalette::Text);
+    QColor outside = base;
+    outside.setRedF(base.redF() * 0.92 + text.redF() * 0.08);
+    outside.setGreenF(base.greenF() * 0.92 + text.greenF() * 0.08);
+    outside.setBlueF(base.blueF() * 0.92 + text.blueF() * 0.08);
+    painter->fillRect(exposed, outside);
+    painter->fillRect(workspaceRect().intersected(exposed), base);
+    QPen border(text, 1.5, Qt::DashLine);
+    border.setCosmetic(true);
+    painter->setPen(border);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(workspaceRect());
 }
 
 QVector<GraphVertexData> AutomatonGraphEditor::vertices() const {
@@ -576,7 +602,6 @@ bool AutomatonGraphEditor::fromJson(const QJsonObject& object, QString* error) {
                            item.value(QStringLiteral("controlY")).toDouble()));
     }
     updatePalette();
-    updateSceneBounds();
     centerOn(m_scene->itemsBoundingRect().center());
     emit graphChanged();
     return true;

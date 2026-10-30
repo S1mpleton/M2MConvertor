@@ -1,5 +1,6 @@
 #include "infrastructure/translationmanager.h"
 #include "infrastructure/logger.h"
+#include "infrastructure/progressstore.h"
 #include "ui/logwindow.h"
 #include <QAction>
 #include <QMenu>
@@ -10,6 +11,7 @@
 #include "mainwindow.h"
 #include "ui/automatongrapheditor.h"
 #include "ui/automatoneditor.h"
+#include "ui/contraststyle.h"
 #include "ui/mealycelldelegate.h"
 #include "ui/widgets/taskimage.h"
 #include "ui/widgets/hintsplitter.h"
@@ -20,6 +22,9 @@
 #include <QToolButton>
 #include "ui/widgets/feedbacklabel.h"
 #include <QGraphicsOpacityEffect>
+#include <QGraphicsScene>
+#include <QGraphicsItem>
+#include <QMouseEvent>
 
 #include <QApplication>
 #include <QLabel>
@@ -72,6 +77,12 @@ struct MainWindowTestAccess {
         window.acceptCounts();
     }
     static QJsonObject progress(MainWindow& window) { return window.progressData(); }
+    static bool dirty(MainWindow& window) { return window.hasUnsavedChanges(); }
+    static bool save(MainWindow& window, const QString& path) {
+        window.m_progressPath = path;
+        return window.saveProgress();
+    }
+    static void back(MainWindow& window) { window.returnToLanding(); }
     static bool restore(MainWindow& window, const QJsonObject& data) {
         return window.restoreProgress(data, QString());
     }
@@ -290,10 +301,12 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* english = window.findChild<QAction*>("languageEnglishAction");
     auto* russian = window.findChild<QAction*>("languageRussianAction");
     require(settingsMenu && english && russian, "Settings exposes language actions");
+    require(MainWindowTestAccess::save(window, temporary.filePath("accepted-work.m2mwork")), "completed work saves before language switch");
     window.findChild<QAction*>("eventLogAction")->trigger(); QApplication::processEvents();
     auto* log = window.findChild<LogWindow*>("eventLogWindow");
     require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
     english->trigger(); QApplication::processEvents();
+    require(!MainWindowTestAccess::dirty(window), "translated generated table headings do not create unsaved changes");
     if (!screenshot.isEmpty()) {
         window.grab().save(screenshot + ".english.png");
         log->grab().save(screenshot + ".log-english.png");
@@ -397,6 +410,113 @@ void testJournal() {
     TranslationManager::instance().setLocale("ru_RU", false);
 }
 
+void testBoundedGraph(const QString& screenshot) {
+    AutomatonGraphEditor graph;
+    graph.resize(700, 480); graph.show();
+    for (int i = 0; i < 3; ++i) graph.createVertex();
+    auto data = graph.toJson();
+    data.insert("edges", QJsonArray{
+        QJsonObject{{"from", 1}, {"to", 2}, {"label", "x0/y0"}},
+        QJsonObject{{"from", 2}, {"to", 3}, {"label", "x1/-"}},
+        QJsonObject{{"from", 2}, {"to", 2}, {"label", "x2/y0"}}});
+    require(graph.fromJson(data), "stress graph loads with incoming, outgoing and loop edges");
+    QApplication::processEvents();
+    const auto canvas = graph.scene()->sceneRect();
+    const auto initial = graph.vertices()[1].position;
+    const auto start = graph.mapFromScene(initial);
+    QTest::mousePress(graph.viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    for (int i = 0; i < 160; ++i) {
+        const QPointF point((i & 1) ? -100000 : 100000, (i & 2) ? -100000 : 100000);
+        QMouseEvent move(QEvent::MouseMove, point, graph.viewport()->mapToGlobal(point.toPoint()),
+            Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(graph.viewport(), &move);
+        if (i % 10 == 0) QApplication::processEvents();
+        require(graph.scene()->sceneRect() == canvas, "dragging never changes scene or scroll bounds");
+        for (const auto& vertex : graph.vertices())
+            require(AutomatonGraphEditor::workspaceRect().adjusted(34, 34, -34, -34).contains(vertex.position),
+                "whole vertices stay inside the visible workspace boundary");
+    }
+    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(start), graph.viewport()->mapToGlobal(start),
+        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(graph.viewport(), &release);
+    require(QLineF(initial, graph.vertices()[1].position).length() > 300 && graph.edges().size() == 3,
+        "far dragging moves the vertex to a boundary while retaining all attached edges");
+    // Also exercise programmatic restores and moves beyond the old, unbounded scene.
+    auto legacy = graph.toJson();
+    auto vertices = legacy.value("vertices").toArray();
+    auto first = vertices[0].toObject(); first.insert("x", 1e12); first.insert("y", -1e12); vertices[0] = first;
+    legacy.insert("vertices", vertices);
+    auto edges = legacy.value("edges").toArray();
+    auto edge = edges[0].toObject(); edge.insert("controlX", -1e12); edge.insert("controlY", 1e12); edges[0] = edge;
+    legacy.insert("edges", edges);
+    require(graph.fromJson(legacy), "old off-canvas progress safely restores");
+    for (const auto& vertex : graph.vertices())
+        require(AutomatonGraphEditor::workspaceRect().contains(vertex.position), "restored positions are bounded");
+    for (const auto& edge : graph.edges())
+        require(qAbs(edge.controlOffset.x()) <= canvas.width() && qAbs(edge.controlOffset.y()) <= canvas.height(),
+            "restored edge bends cannot grow an unbounded path");
+    graph.centerOn(graph.vertices().first().position); QApplication::processEvents();
+    if (!screenshot.isEmpty()) graph.grab().save(screenshot + ".canvas-boundary.png");
+}
+
+void testUnsavedChanges() {
+    MainWindow window;
+    TrainingVariant task; task.number = 7; task.reaction = {{"x9", {"y4"}}};
+    auto start = [&] {
+        require(MainWindowTestAccess::setup(window, task), "fresh work starts");
+        window.findChild<QStackedWidget*>()->setCurrentIndex(1);
+        window.show(); window.activateWindow(); QApplication::processEvents();
+    };
+    int questions = 0;
+    auto answer = [&](QMessageBox::StandardButton choice) {
+        QTimer::singleShot(0, &window, [&, choice] {
+            if (auto* dialog = window.findChild<QMessageBox*>("unsavedChangesDialog")) {
+                ++questions;
+                dialog->button(choice)->click();
+            }
+        });
+    };
+    start();
+    require(!MainWindowTestAccess::dirty(window), "new untouched work is clean");
+    answer(QMessageBox::Cancel); MainWindowTestAccess::back(window); QApplication::processEvents();
+    require(questions == 0 && window.findChild<QStackedWidget*>()->currentIndex() == 0,
+        "returning from untouched work does not warn");
+    start();
+    TranslationManager::instance().setLocale("en", false); QApplication::processEvents();
+    window.findChild<AutomatonEditor*>("sourceEditor")->findChild<HintSplitter*>("tableAssignment")->setExpanded(false);
+    require(!MainWindowTestAccess::dirty(window), "language and hint layout changes do not mark answers modified");
+    TranslationManager::instance().setLocale("ru_RU", false);
+    MainWindowTestAccess::acceptCounts(window);
+    QTemporaryDir temporary; const auto path = temporary.filePath("work.m2mwork");
+    require(MainWindowTestAccess::save(window, path) && !MainWindowTestAccess::dirty(window), "successful save establishes a clean baseline");
+    auto* table = window.findChild<AutomatonEditor*>("sourceEditor")->findChild<QTableWidget*>("transitionTable");
+    table->editItem(table->item(4, 0)); QApplication::processEvents();
+    auto* edit = table->findChild<QLineEdit*>(); require(edit, "pending cell editor opens");
+    edit->setText("x9"); edit->setFocus();
+    answer(QMessageBox::Cancel); require(!window.close(), "Cancel prevents closing dirty work"); QApplication::processEvents();
+    require(questions == 1 && table->item(4, 0)->text() == "x9" && MainWindowTestAccess::dirty(window),
+        "closing commits the active cell before checking unsaved changes");
+    answer(QMessageBox::Cancel); MainWindowTestAccess::back(window); QApplication::processEvents();
+    require(questions == 2 && window.findChild<QStackedWidget*>()->currentIndex() == 1,
+        "Cancel also prevents returning to variant selection");
+    answer(QMessageBox::Save); require(window.close(), "Save writes work before closing"); QApplication::processEvents();
+    QJsonObject saved; require(ProgressStore::read(path, &saved).ok() && !MainWindowTestAccess::dirty(window), "saved work is clean");
+    require(saved.value("source").toObject().value("table").toArray()[4].toArray()[0].toString() == "x9",
+        "the pending cell is present in the saved file");
+    window.show(); QApplication::processEvents();
+    answer(QMessageBox::Cancel); MainWindowTestAccess::back(window); QApplication::processEvents();
+    require(questions == 3 && window.findChild<QStackedWidget*>()->currentIndex() == 0,
+        "saved work returns without an extra warning");
+    start(); MainWindowTestAccess::acceptCounts(window);
+    require(!MainWindowTestAccess::save(window, temporary.filePath("missing/work.m2mwork")), "unwritable destination returns failure");
+    answer(QMessageBox::Save); require(!window.close(), "save failure prevents closing"); QApplication::processEvents();
+    require(MainWindowTestAccess::dirty(window), "failed save retains the unsaved state");
+    answer(QMessageBox::Discard); MainWindowTestAccess::back(window); QApplication::processEvents();
+    require(window.findChild<QStackedWidget*>()->currentIndex() == 0, "Discard returns to selection");
+    start(); MainWindowTestAccess::acceptCounts(window);
+    answer(QMessageBox::Discard); require(window.close(), "Discard allows closing dirty work"); QApplication::processEvents();
+}
+
 void testHintDrag() {
     auto* hint = new TaskImage;
     auto* work = new QWidget; work->setMinimumHeight(90);
@@ -461,6 +581,7 @@ void testValidationAndFeedback() {
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    app.setStyle(new ContrastStyle);
     QTemporaryDir settings;
     QCoreApplication::setOrganizationName("M2MTests"); QCoreApplication::setApplicationName("M2MConvertorTests");
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -624,6 +745,8 @@ int main(int argc, char** argv) {
                 "interactive graph screenshot is saved");
     }
     testReactionWorkflow(window, argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
+    testBoundedGraph(argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
+    testUnsavedChanges();
     testJournal();
     testHintDrag();
     testImages();
