@@ -127,24 +127,29 @@ QWidget* AutomatonEditor::createTablePage() {
     workLayout->setContentsMargins(0, 0, 0, 0);
     workLayout->setSpacing(8);
     auto* setup = new ActionBar(Qt::AlignJustify);
-    m_mealySetup = setup;
     m_clearTableButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить таблицу"));
     m_clearTableButton->setObjectName("clearTableButton");
     m_clearTableButton->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
-    setup->addWidget(m_clearTableButton);
+    auto* commands = new QWidget;
+    commands->setObjectName("tableSetupButtons");
+    auto* commandLayout = new QVBoxLayout(commands);
+    commandLayout->setContentsMargins(0, 0, 0, 0);
+    commandLayout->setSpacing(8);
+    commandLayout->addWidget(m_clearTableButton);
+    setup->addWidget(commands);
     auto* fields = new QWidget;
     auto* form = new QGridLayout(fields);
     form->setContentsMargins(0, 0, 0, 0);
-    m_mealyStates = new QSpinBox;
-    m_mealyInputs = new QSpinBox;
-    m_mealyOutputs = new QSpinBox;
-    m_mealyStates->setObjectName("mealyStateCount");
-    m_mealyInputs->setObjectName("mealyInputCount");
-    m_mealyOutputs->setObjectName("mealyOutputCount");
-    m_mealyStates->setRange(0, 999999);
-    m_mealyInputs->setRange(0, 10);
-    m_mealyOutputs->setRange(0, 10);
-    const QVector<QSpinBox*> counts{m_mealyStates, m_mealyInputs, m_mealyOutputs};
+    m_countStates = new QSpinBox;
+    m_countInputs = new QSpinBox;
+    m_countOutputs = new QSpinBox;
+    m_countStates->setObjectName("mealyStateCount");
+    m_countInputs->setObjectName("mealyInputCount");
+    m_countOutputs->setObjectName("mealyOutputCount");
+    m_countStates->setRange(0, 999999);
+    m_countInputs->setRange(0, 10);
+    m_countOutputs->setRange(0, 10);
+    const QVector<QSpinBox*> counts{m_countStates, m_countInputs, m_countOutputs};
     const char* labels[] = {QT_TRANSLATE_NOOP("App", "Количество состояний:"),
         QT_TRANSLATE_NOOP("App", "Количество входных сигналов:"),
         QT_TRANSLATE_NOOP("App", "Количество выходных сигналов:")};
@@ -164,7 +169,7 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* build = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
     build->setObjectName("configureTableButton");
     build->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    form->addWidget(build, 2, 2);
+    commandLayout->addWidget(build);
     setup->addWidget(fields, Qt::AlignRight);
     workLayout->addWidget(setup);
     m_tableContent = new QWidget;
@@ -190,7 +195,7 @@ QWidget* AutomatonEditor::createTablePage() {
     accept->setObjectName(QStringLiteral("acceptTableButton"));
     accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
     connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptTable);
-    connect(build, &QPushButton::clicked, this, &AutomatonEditor::configureMealyTable);
+    connect(build, &QPushButton::clicked, this, &AutomatonEditor::configureTableFromCounts);
     connect(m_clearTableButton, &QPushButton::clicked, this, &AutomatonEditor::clearTable);
     connect(m_transitionTable, &QTableWidget::itemChanged, this, [this] { invalidateFromTable(); });
     auto* body = new QWidget;
@@ -251,7 +256,9 @@ QWidget* AutomatonEditor::createMatrixPage() {
     m_matrixTable->verticalHeader()->setDefaultSectionSize(36);
     m_matrixTable->setAlternatingRowColors(true);
     auto* tables = new QHBoxLayout;
-    tables->addWidget(new QLabel("C ="));
+    m_matrixCaption = new QLabel;
+    m_matrixCaption->setObjectName("matrixCaption");
+    tables->addWidget(m_matrixCaption);
     tables->addWidget(m_matrixTable, 3);
     m_matrixOutputs = new QTableWidget;
     m_matrixOutputs->setObjectName("matrixOutputs");
@@ -363,7 +370,10 @@ QWidget* AutomatonEditor::createGraphPage() {
 void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
     m_task = task;
     m_editorKind = kind;
-    m_mealySetup->setVisible(kind == AutomatonKind::Mealy);
+    m_countStates->setObjectName(kind == AutomatonKind::Moore ? "mooreStateCount" : "mealyStateCount");
+    m_countInputs->setObjectName(kind == AutomatonKind::Moore ? "mooreInputCount" : "mealyInputCount");
+    m_countOutputs->setObjectName(kind == AutomatonKind::Moore ? "mooreOutputCount" : "mealyOutputCount");
+    m_matrixCaption->setText(kind == AutomatonKind::Moore ? "A =" : "B =");
     m_assignmentPanel->setExpanded(true); m_matrixPanel->setExpanded(true); m_graphPanel->setExpanded(true);
     resetEditor();
     m_matrixOutputs->setVisible(kind == AutomatonKind::Moore);
@@ -373,16 +383,13 @@ void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
 
 void AutomatonEditor::resetEditor() {
     m_loading = true;
-    m_tableConfigured = m_editorKind == AutomatonKind::Moore;
-    for (auto* count : {m_mealyStates, m_mealyInputs, m_mealyOutputs}) count->setValue(0);
-    if (m_tableConfigured) configureTable();
-    else {
-        m_transitionTable->clearSpans();
-        m_transitionTable->clear();
-        m_transitionTable->setRowCount(0);
-        m_transitionTable->setColumnCount(0);
-        m_tableContent->hide();
-    }
+    m_tableConfigured = false;
+    for (auto* count : {m_countStates, m_countInputs, m_countOutputs}) count->setValue(0);
+    m_transitionTable->clearSpans();
+    m_transitionTable->clear();
+    m_transitionTable->setRowCount(0);
+    m_transitionTable->setColumnCount(0);
+    m_tableContent->hide();
     m_acceptTableButton->setEnabled(m_tableConfigured);
     m_clearTableButton->setEnabled(m_tableConfigured);
     resetMatrix();
@@ -445,17 +452,17 @@ void AutomatonEditor::configureTable() {
     m_loading = loading;
 }
 
-bool AutomatonEditor::mealyCountsMatch() const {
-    const auto& counts = m_task.mealy;
-    return m_mealyStates->value() == counts.states && m_mealyInputs->value() == counts.inputs &&
-        m_mealyOutputs->value() == counts.outputs;
+bool AutomatonEditor::countsMatch() const {
+    const auto& counts = m_task.counts(m_editorKind);
+    return m_countStates->value() == counts.states && m_countInputs->value() == counts.inputs &&
+        m_countOutputs->value() == counts.outputs;
 }
 
-void AutomatonEditor::configureMealyTable() {
-    if (m_editorKind != AutomatonKind::Mealy) return;
-    for (auto* count : {m_mealyStates, m_mealyInputs, m_mealyOutputs}) count->interpretText();
-    if (!mealyCountsMatch()) {
-        showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Количество состояний или сигналов автомата Мили не соответствует варианту.")), false, 0);
+void AutomatonEditor::configureTableFromCounts() {
+    for (auto* count : {m_countStates, m_countInputs, m_countOutputs}) count->interpretText();
+    if (!countsMatch()) {
+        const auto kind = m_editorKind == AutomatonKind::Moore ? Message(QT_TRANSLATE_NOOP("Result", "Мура")) : Message(QT_TRANSLATE_NOOP("Result", "Мили"));
+        showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Количество состояний или сигналов автомата %1 не соответствует варианту.")).arg(kind), false, 0);
         return;
     }
     if (m_transitionTable->rowCount() == 0) configureTable();
@@ -998,9 +1005,9 @@ QJsonObject AutomatonEditor::toJson() const {
     object.insert(QStringLiteral("matrixOutputs"), tableToJson(m_matrixOutputs));
     object.insert(QStringLiteral("matrix"), tableToJson(m_matrixTable));
     object.insert("matrixDimension", m_matrixDimension->value());
-    if (m_editorKind == AutomatonKind::Mealy)
-        object.insert("mealySetup", QJsonObject{{"states", m_mealyStates->value()}, {"inputs", m_mealyInputs->value()},
-            {"outputs", m_mealyOutputs->value()}, {"accepted", m_tableConfigured}});
+    object.insert(m_editorKind == AutomatonKind::Moore ? "mooreSetup" : "mealySetup",
+        QJsonObject{{"states", m_countStates->value()}, {"inputs", m_countInputs->value()},
+            {"outputs", m_countOutputs->value()}, {"accepted", m_tableConfigured}});
     object.insert(QStringLiteral("graph"), m_graphEditor->toJson());
     object.insert(QStringLiteral("tableAccepted"), m_tableAccepted);
     object.insert(QStringLiteral("matrixAccepted"), m_matrixAccepted);
@@ -1041,15 +1048,17 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
     if (extents.contains("matrix")) m_matrixPanel->setHintExtent(qBound(0, extents.value("matrix").toInt(170), 10000));
     if (extents.contains("graph")) m_graphPanel->setHintExtent(qBound(0, extents.value("graph").toInt(170), 10000));
     m_loading = true;
-    if (m_editorKind == AutomatonKind::Mealy) {
+    {
         const bool built = !object.value("table").toArray().isEmpty();
-        const auto setup = object.value("mealySetup").toObject();
-        const bool legacy = !object.contains("mealySetup");
-        m_mealyStates->setValue(legacy && built ? m_task.mealy.states : setup.value("states").toInt());
-        m_mealyInputs->setValue(legacy && built ? m_task.mealy.inputs : setup.value("inputs").toInt());
-        m_mealyOutputs->setValue(legacy && built ? m_task.mealy.outputs : setup.value("outputs").toInt());
+        const auto key = m_editorKind == AutomatonKind::Moore ? "mooreSetup" : "mealySetup";
+        const auto setup = object.value(key).toObject();
+        const bool legacy = !object.contains(key);
+        const auto& expected = m_task.counts(m_editorKind);
+        m_countStates->setValue(legacy && built ? expected.states : setup.value("states").toInt());
+        m_countInputs->setValue(legacy && built ? expected.inputs : setup.value("inputs").toInt());
+        m_countOutputs->setValue(legacy && built ? expected.outputs : setup.value("outputs").toInt());
         if (built) configureTable();
-        m_tableConfigured = built && mealyCountsMatch() && (legacy || setup.value("accepted").toBool());
+        m_tableConfigured = built && countsMatch() && (legacy || setup.value("accepted").toBool());
         m_acceptTableButton->setEnabled(m_tableConfigured);
     }
     if (object.value("tableLayout").toInt() == 3) {

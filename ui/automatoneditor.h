@@ -45,9 +45,9 @@ private:
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
     void configureTable();
-    void configureMealyTable();
+    void configureTableFromCounts();
     void clearTable();
-    bool mealyCountsMatch() const;
+    bool countsMatch() const;
     void fillEmptyCells(QTableWidget* table) const;
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, Message* error) const;
@@ -93,10 +93,9 @@ private:
     QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
     QWidget* m_tableContent;
-    QWidget* m_mealySetup;
-    QSpinBox* m_mealyStates;
-    QSpinBox* m_mealyInputs;
-    QSpinBox* m_mealyOutputs;
+    QSpinBox* m_countStates;
+    QSpinBox* m_countInputs;
+    QSpinBox* m_countOutputs;
     QPushButton* m_clearTableButton;
     QPushButton* m_acceptTableButton;
 
@@ -105,6 +104,7 @@ private:
     QPushButton* m_clearMatrixButton;
     QPushButton* m_acceptMatrixButton;
     QLabel* m_outputCaption;
+    QLabel* m_matrixCaption;
     QTableWidget* m_matrixOutputs;
     QTableWidget* m_matrixTable;
     QTableWidget* m_matrixReference;

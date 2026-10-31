@@ -79,10 +79,12 @@ struct MainWindowTestAccess {
     }
     static void begin(MainWindow& window) { window.beginWork(); }
     static void acceptCounts(MainWindow& window) {
-        window.m_stateCount->setValue(window.m_currentVariant.moore.states);
-        window.m_inputCount->setValue(window.m_currentVariant.moore.inputs);
-        window.m_outputCount->setValue(window.m_currentVariant.moore.outputs);
-        window.acceptCounts();
+        window.continueWork();
+        auto* editor = window.m_sourceEditor;
+        editor->findChild<QSpinBox*>("mooreStateCount")->setValue(window.m_currentVariant.moore.states);
+        editor->findChild<QSpinBox*>("mooreInputCount")->setValue(window.m_currentVariant.moore.inputs);
+        editor->findChild<QSpinBox*>("mooreOutputCount")->setValue(window.m_currentVariant.moore.outputs);
+        editor->findChild<QPushButton*>("configureTableButton")->click();
     }
     static QJsonObject progress(MainWindow& window) { return window.progressData(); }
     static bool dirty(MainWindow& window) { return window.hasUnsavedChanges(); }
@@ -158,6 +160,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     QFile file(archivePath); require(file.open(QIODevice::WriteOnly), "archive opens");
     file.write(makeCompatibleArchive(root)); file.close();
     require(MainWindowTestAccess::open(window, archivePath), "new archive opens");
+    require(window.findChild<QLabel*>("archiveSummary")->text().contains("tasks.m2m") &&
+        window.findChild<QLabel*>("archiveSummary")->text().contains("Вариантов: 2"),
+        "archive card shows the filename and number of variants");
     auto* combo = window.findChild<QComboBox*>("variantCombo");
     require(combo->currentData().toInt() == 7 &&
         !(combo->model()->flags(combo->model()->index(0, 0)) & Qt::ItemIsEnabled), "unfinished direction disabled");
@@ -165,29 +170,43 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     QApplication::processEvents();
     QApplication::processEvents();
     QApplication::processEvents();
-    auto* countForm = window.findChild<QFormLayout*>("sourceCountsForm");
-    for (int row = 0; row < 3; ++row) {
-        auto* label = countForm->itemAt(row, QFormLayout::LabelRole)->widget();
-        auto* field = countForm->itemAt(row, QFormLayout::FieldRole)->widget();
-        require(qAbs(label->geometry().center().y() - field->geometry().center().y()) <= 2,
-            "count fields stay on the same row as their labels at the startup size");
-    }
-    require(window.findChild<WorkScrollArea*>("startWorkArea")->horizontalScrollBar()->maximum() == 0,
-        "startup splitter leaves enough width to show the whole count form");
+    auto* workflow = window.findChild<QTabWidget*>("workflowTabs");
+    auto* source = window.findChild<AutomatonEditor*>("sourceEditor");
+    auto* target = window.findChild<AutomatonEditor*>("targetEditor");
+    auto* table = source->findChild<QTableWidget*>("transitionTable");
+    require(workflow->widget(0)->findChildren<QSpinBox*>().isEmpty(), "start page contains no count inputs");
+    require(window.findChild<QLabel*>("startVariantInfo")->text().contains("№7") &&
+        window.findChild<QLabel*>("startVariantInfo")->text().contains("Мура → Мили"),
+        "start explanations include the variant number and conversion");
+    require(window.findChild<QLabel*>("workInstructions")->text().contains("Ctrl+S") &&
+        table->rowCount() == 0, "detailed instructions precede table configuration");
+    require(qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() ==
+        "Пояснения к работе", "start work area is titled Explanations");
     require(window.screen()->availableGeometry().contains(window.frameGeometry()), "opening a task keeps the frame on screen");
-    if (window.frameGeometry().height() < window.screen()->availableGeometry().height() - 1)
-        require(window.findChild<WorkScrollArea*>("startWorkArea")->verticalScrollBar()->maximum() == 0,
-            "startup form fits vertically when the screen has enough room");
     if (!screenshot.isEmpty()) window.grab().save(screenshot + ".compact-start.png");
+    window.findChild<QPushButton*>("continueWorkButton")->click();
+    require(workflow->currentIndex() == 1 && table->rowCount() == 0,
+        "Continue opens Moore without building a table");
+    auto* sourceStates = source->findChild<QSpinBox*>("mooreStateCount");
+    sourceStates->setValue(2);
+    source->findChild<QSpinBox*>("mooreInputCount")->setValue(1);
+    source->findChild<QSpinBox*>("mooreOutputCount")->setValue(1);
+    source->findChild<QPushButton*>("configureTableButton")->click();
+    require(table->rowCount() == 0, "incorrect Moore counts do not build a table");
+    {
+        MainWindow draft;
+        require(MainWindowTestAccess::restore(draft, MainWindowTestAccess::progress(window)), "unbuilt Moore setup restores");
+        auto* restoredSource = draft.findChild<AutomatonEditor*>("sourceEditor");
+        require(restoredSource->findChild<QSpinBox*>("mooreStateCount")->value() == 2 &&
+            restoredSource->findChild<QTableWidget*>("transitionTable")->rowCount() == 0,
+            "Moore count draft remains unbuilt after restoring");
+    }
+    workflow->setCurrentIndex(0); QApplication::processEvents();
     window.resize(1100, 820); QApplication::processEvents();
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".start.png");
     }
     MainWindowTestAccess::acceptCounts(window);
-    auto* source = window.findChild<AutomatonEditor*>("sourceEditor");
-    auto* target = window.findChild<AutomatonEditor*>("targetEditor");
-    auto* workflow = window.findChild<QTabWidget*>("workflowTabs");
-    auto* table = source->findChild<QTableWidget*>("transitionTable");
     require(!source->findChild<QLineEdit*>("inputSignals") && table->rowCount() == 5 &&
         table->columnCount() == 2 && table->item(3, 1)->text() == "a0" &&
         !(table->item(3, 1)->flags() & Qt::ItemIsEditable) &&
@@ -266,9 +285,10 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(matrix->rowCount() == 1 && matrix->item(0, 0)->text() == "-" && outputs->item(0, 1)->text() == "-",
         "Clear resets both matrices while keeping their dimension");
     outputs->item(0, 1)->setText("y4");
-    bool c = false, y = false;
-    for (auto* label : source->findChildren<QLabel*>()) { c |= label->text() == "C ="; y |= label->text() == "Y ="; }
-    require(c && y, "matrix and output table have mathematical captions");
+    bool a = false, y = false;
+    for (auto* label : source->findChildren<QLabel*>()) { a |= label->text() == "A ="; y |= label->text() == "Y ="; }
+    require(a && y && target->findChild<QLabel*>("matrixCaption")->text() == "B =",
+        "Moore and Mealy matrices have the A, Y and B captions");
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".matrix.png");
         const auto dark = QApplication::palette();
@@ -409,6 +429,10 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* log = window.findChild<LogWindow*>("eventLogWindow");
     require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
     english->trigger(); QApplication::processEvents();
+    require(window.findChild<QPushButton*>("continueWorkButton")->text() == "Continue" &&
+        qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() == "Work instructions" &&
+        window.findChild<QLabel*>("archiveSummary")->text().contains("Variants: 2"),
+        "new start and archive texts follow a live language switch");
     require(hoverHelp(target->findChild<QTableWidget*>("graphReference"), 2, 1).contains("read-only"),
         "cell hints follow a live language switch");
     require(!MainWindowTestAccess::dirty(window), "translated generated table headings do not create unsaved changes");
@@ -456,11 +480,18 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
                 auto* active = representation->currentWidget();
                 if (tab == 1) requireMatrixHeadersFit(editor == 0 ? source : target);
                 require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
-                const QStringList names = tab == 0 ? (editor == 0 ? QStringList{"acceptTableButton"} :
-                    QStringList{"clearTableButton", "configureTableButton", "acceptTableButton"}) : tab == 1 ?
+                const QStringList names = tab == 0 ?
+                    QStringList{"clearTableButton", "configureTableButton", "acceptTableButton"} : tab == 1 ?
                     QStringList{"clearMatrixButton", "configureMatrixButton", "acceptMatrixButton"} :
                     QStringList{"createVertexButton", "deleteVertexButton", "acceptGraphButton"};
                 for (const auto& name : names) requireVisibleAction(&window, active->findChild<QPushButton*>(name));
+                if (tab == 0) {
+                    auto* clearTable = active->findChild<QPushButton*>("clearTableButton");
+                    auto* configureTable = active->findChild<QPushButton*>("configureTableButton");
+                    require(clearTable->width() == configureTable->width() &&
+                        clearTable->geometry().bottom() < configureTable->geometry().top(),
+                        "Clear and Accept have equal widths and stay vertically stacked");
+                }
                 auto* workFrame = qobject_cast<QGroupBox*>(active->findChild<HintSplitter*>()->widget(1));
                 require(workFrame && workFrame->title() == "Рабочая область" &&
                     workFrame->isAncestorOf(active->findChild<QPushButton*>(names.last())),
@@ -477,7 +508,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
             }
         }
         workflow->setCurrentIndex(0); QApplication::processEvents();
-        requireVisibleAction(&window, window.findChild<QPushButton*>("acceptCountsButton"));
+        requireVisibleAction(&window, window.findChild<QPushButton*>("continueWorkButton"));
         workflow->setCurrentIndex(3); QApplication::processEvents();
         requireVisibleAction(&window, window.findChild<QPushButton*>("createReportButton"));
     }
@@ -489,7 +520,21 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         restored.findChild<AutomatonEditor*>("targetEditor")->completed(), "new table and flexible graph revalidate after reload");
     require(!restored.findChild<AutomatonEditor*>("sourceEditor")->findChild<HintSplitter*>("graphHint")->expanded(),
         "hint visibility is preserved with the work");
-    auto legacy = source->toJson(); legacy.remove("tableLayout");
+    auto legacyWork = MainWindowTestAccess::progress(window);
+    legacyWork.remove("introCompleted");
+    legacyWork.insert("countsAccepted", true);
+    legacyWork.insert("stateCount", 1); legacyWork.insert("inputCount", 1); legacyWork.insert("outputCount", 1);
+    auto legacySource = legacyWork.value("source").toObject(); legacySource.remove("mooreSetup");
+    legacyWork.insert("source", legacySource);
+    {
+        MainWindow migrated;
+        require(MainWindowTestAccess::restore(migrated, legacyWork), "old start-page counts migrate into Moore setup");
+        auto* editor = migrated.findChild<AutomatonEditor*>("sourceEditor");
+        require(editor->completed() && editor->findChild<QSpinBox*>("mooreStateCount")->value() == 1 &&
+            migrated.findChild<QTabWidget*>("workflowTabs")->isTabEnabled(2),
+            "legacy counts and accepted answers survive the new workflow");
+    }
+    auto legacy = source->toJson(); legacy.remove("tableLayout"); legacy.remove("mooreSetup");
     legacy.insert("tableInputs", QJsonArray{"x9"});
     legacy.insert("table", QJsonArray{QJsonArray{"y4"}, QJsonArray{"a0"}});
     auto* restoredSource = restored.findChild<AutomatonEditor*>("sourceEditor");
@@ -812,6 +857,14 @@ int main(int argc, char** argv) {
     auto* begin = window.findChild<QPushButton*>(QStringLiteral("beginWorkButton"));
     auto* openProgress = window.findChild<QPushButton*>(QStringLiteral("openProgressButton"));
     require(openArchive && begin && openProgress, "landing actions are available");
+    auto* archiveGroup = window.findChild<QGroupBox*>("archiveGroup");
+    auto* variantGroup = window.findChild<QGroupBox*>("variantGroup");
+    require(archiveGroup->isAncestorOf(openArchive) && variantGroup->isAncestorOf(begin) &&
+        variantGroup->isAncestorOf(openProgress) && openProgress->text() == "Открыть работу…",
+        "landing actions are placed inside their corresponding cards");
+    auto* logo = window.findChild<QLabel*>("landingLogo");
+    require(logo && !logo->pixmap().isNull() && logo->geometry().bottom() <
+        window.findChild<QLabel*>("landingTitle")->geometry().top(), "centered placeholder icon precedes the title");
     require(openArchive->text() == "Открыть архив вариантов…" &&
         window.findChild<QAction*>("eventLogAction")->text() == "Журнал событий",
         "archive and journal captions follow the requested names");
@@ -826,9 +879,8 @@ int main(int argc, char** argv) {
             for (auto* button : {openArchive, begin, openProgress}) requireVisibleAction(&window, button);
             const auto a = begin->mapTo(&window, QPoint());
             const auto b = openProgress->mapTo(&window, QPoint());
-            const auto c = openArchive->mapTo(&window, QPoint());
-            require(a.x() < b.x() && b.x() < c.x() && a.y() == b.y() && b.y() == c.y(),
-                "landing actions keep their left/right order and one baseline");
+            require(a.x() < b.x() && a.y() == b.y(),
+                "variant card actions keep their left/right order and one baseline");
         }
     }
     TranslationManager::instance().setLocale("ru_RU", false);

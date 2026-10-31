@@ -115,3 +115,6 @@ void HintSplitter::setExpanded(bool expanded) {
 void HintSplitter::toggleHint() {
     setExpanded(!expanded());
 }
+void HintSplitter::setWorkTitle(const char* title) {
+    UiText::bind(widget(1), "title", title);
+}

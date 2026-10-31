@@ -44,13 +44,11 @@
 #include <QPushButton>
 #include <QSaveFile>
 #include <QScreen>
-#include <QSpinBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QStyle>
 #include <QTabWidget>
-#include <QTabBar>
 #include <QTextStream>
 #include <QVBoxLayout>
 
@@ -108,148 +106,106 @@ void MainWindow::showEvent(QShowEvent* event) {
 
 void MainWindow::applyInitialSize() {
     layout()->activate();
-    const QRect available = screen()->availableGeometry();
-    const QSize frame = frameGeometry().size() - size();
-    const QSize limit = available.size() - frame;
-    const auto* controlLayout = m_startWorkScroll->widget()->layout();
-    const int workWidth = startWorkWidth();
-    const auto startMargins = m_startSplitter->parentWidget()->layout()->contentsMargins();
-    const auto workspaceMargins = m_workflowTabs->parentWidget()->layout()->contentsMargins();
-    const int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth) * 2;
-    const int width = qMax(m_landingScroll->widget()->layout()->sizeHint().width(),
-        workWidth + m_startSplitter->widget(0)->minimumWidth() + m_startSplitter->handleWidth() +
-        startMargins.left() + startMargins.right() + workspaceMargins.left() + workspaceMargins.right() + frameWidth);
-    const int targetWidth = qMin(width, limit.width());
-    const auto* startLayout = m_startSplitter->parentWidget()->layout();
-    const auto* workspaceLayout = m_workflowTabs->parentWidget()->layout();
-    const int chromeHeight = startMargins.top() + startMargins.bottom() +
-        workspaceMargins.top() + workspaceMargins.bottom() + m_directionLabel->sizeHint().height() +
-        startLayout->spacing() + workspaceLayout->itemAt(0)->sizeHint().height() + workspaceLayout->spacing() +
-        m_workflowTabs->findChild<QTabBar*>()->sizeHint().height() + frameWidth + menuBar()->sizeHint().height();
-    // Reserve one line of feedback so opening a task does not squeeze the count form.
-    const int workHeight = qMax(controlLayout->minimumSize().height(), controlLayout->minimumHeightForWidth(workWidth)) +
-        chromeHeight + fontMetrics().height() + 24;
-    resize(targetWidth, qMin(qMax(minimumSizeHint().height(), workHeight), limit.height()));
+    const auto available = screen()->availableGeometry();
+    const auto decoration = frameGeometry().size() - size();
+    const auto limit = available.size() - decoration;
+    const int preferredWidth = qMax(minimumSizeHint().width(), qMax(640, fontMetrics().averageCharWidth() * 110));
+    const int width = qMin(preferredWidth, limit.width());
+    resize(width, qMin(qMax(minimumSizeHint().height(), 480), limit.height()));
     layout()->activate();
-    const auto* landingLayout = m_landingScroll->widget()->layout();
-    const int landingHeight = qMax(landingLayout->minimumSize().height(),
-        landingLayout->minimumHeightForWidth(m_landingScroll->viewport()->width()));
-    const int footerHeight = qMax(m_landingFooter->minimumSizeHint().height(), m_landingFooter->heightForWidth(targetWidth));
-    const int height = qMax(landingHeight + menuBar()->height() + footerHeight, workHeight);
-    resize(targetWidth, qMin(height, limit.height()));
+    const auto* landingLayout = m_landingPage->layout();
+    const int landingHeight = qMax(landingLayout->minimumSize().height(), landingLayout->minimumHeightForWidth(width));
+    resize(width, qMin(qMax(minimumSizeHint().height(), landingHeight + menuBar()->height()), limit.height()));
     if (isVisible()) {
-        const QPoint decoration = pos() - frameGeometry().topLeft();
-        move(available.center() - QPoint(frameGeometry().width() / 2, frameGeometry().height() / 2) + decoration);
+        const auto offset = pos() - frameGeometry().topLeft();
+        move(available.center() - QPoint(frameGeometry().width() / 2, frameGeometry().height() / 2) + offset);
     }
 }
 
 QWidget* MainWindow::createLandingPage() {
-    auto* page = new QWidget;
-    auto* outer = new QVBoxLayout(page);
-    outer->setContentsMargins(36, 28, 36, 12);
-    outer->setSpacing(18);
+    m_landingPage = new QWidget;
+    auto* outer = new QVBoxLayout(m_landingPage);
+    outer->setContentsMargins(24, 20, 24, 20);
+    outer->setSpacing(16);
+    m_landingLogo = new QLabel;
+    m_landingLogo->setObjectName("landingLogo");
+    m_landingLogo->setAlignment(Qt::AlignCenter);
+    m_landingLogo->setFixedHeight(88);
+    m_landingLogo->setPixmap(AppIcons::icon(AppIcons::Kind::Swap).pixmap(72, 72));
+    outer->addWidget(m_landingLogo);
     auto* title = new WrappingLabel;
     UiText::bind(title, "text", QT_TRANSLATE_NOOP("App", "Преобразование конечных автоматов Мили и Мура"));
-    title->setObjectName(QStringLiteral("landingTitle"));
-    QFont titleFont = title->font();
-    titleFont.setPointSize(17);
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    title->setAlignment(Qt::AlignCenter);
-    auto* explanation = new WrappingLabel;
-    UiText::bind(explanation, "text", QT_TRANSLATE_NOOP("App", "Откройте зашифрованную базу .m2m с реакциями и выберите вариант."));
-    explanation->setWordWrap(true);
+    title->setObjectName("landingTitle");
+    auto titleFont = title->font(); titleFont.setPointSize(17); titleFont.setBold(true);
+    title->setFont(titleFont); title->setAlignment(Qt::AlignCenter);
     outer->addWidget(title);
-    outer->addWidget(explanation);
 
     auto* content = new QWidget;
-    content->setObjectName(QStringLiteral("landingContent"));
-    auto* contentLayout = new QHBoxLayout(content);
-    contentLayout->setContentsMargins(0, 12, 0, 12);
-    contentLayout->setSpacing(24);
-
+    content->setObjectName("landingContent");
+    auto* cards = new QHBoxLayout(content);
+    cards->setContentsMargins(0, 0, 0, 0); cards->setSpacing(20);
     auto* archiveGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "1. База вариантов"));
+    archiveGroup->setObjectName("archiveGroup");
     auto* archiveLayout = new QVBoxLayout(archiveGroup);
-    archiveLayout->setContentsMargins(20, 24, 20, 20);
-    archiveLayout->setSpacing(14);
+    auto* archiveBody = new QWidget;
+    auto* archiveText = new QVBoxLayout(archiveBody);
+    archiveText->setContentsMargins(0, 0, 0, 0);
     auto* archiveHint = new WrappingLabel;
-    UiText::bind(archiveHint, "text", QT_TRANSLATE_NOOP("App", "Выберите файл .m2m с реакциями. "
-        "Приложение проверит целостность архива перед показом вариантов."));
-    archiveHint->setWordWrap(true);
-    archiveLayout->addWidget(archiveHint);
+    UiText::bind(archiveHint, "text", QT_TRANSLATE_NOOP("App", "Откройте архив .m2m"));
+    archiveText->addWidget(archiveHint);
     m_archivePathLabel = new WrappingLabel;
-    UiText::bind(m_archivePathLabel, "text", QT_TRANSLATE_NOOP("App", "BazaVar не выбран"));
+    m_archivePathLabel->setObjectName("archiveSummary");
+    m_archivePathLabel->setTextFormat(Qt::PlainText);
     m_archivePathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    m_archivePathLabel->setWordWrap(true);
+    archiveText->addWidget(m_archivePathLabel);
+    archiveText->addStretch();
+    archiveLayout->addWidget(new WorkScrollArea(archiveBody), 1);
     auto* archiveButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
     UiText::bind(archiveButton, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
-    archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
+    archiveButton->setObjectName("openArchiveButton");
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
-    archiveLayout->addWidget(m_archivePathLabel);
-    archiveLayout->addStretch();
+    auto* archiveActions = new QHBoxLayout;
+    archiveActions->addWidget(archiveButton);
+    archiveLayout->addLayout(archiveActions);
 
     auto* variantGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "2. Вариант работы"));
+    variantGroup->setObjectName("variantGroup");
     auto* variantLayout = new QVBoxLayout(variantGroup);
-    variantLayout->setContentsMargins(20, 24, 20, 20);
-    variantLayout->setSpacing(14);
+    auto* variantBody = new QWidget;
+    auto* variantText = new QVBoxLayout(variantBody);
+    variantText->setContentsMargins(0, 0, 0, 0);
     auto* variantHint = new WrappingLabel;
     UiText::bind(variantHint, "text", QT_TRANSLATE_NOOP("App", "Выберите номер варианта."));
-    variantHint->setWordWrap(true);
-    variantLayout->addWidget(variantHint);
+    variantText->addWidget(variantHint);
     auto* form = new QFormLayout;
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_variantCombo = new QComboBox;
-    m_variantCombo->setObjectName("variantCombo");
-    m_variantCombo->setEnabled(false);
+    m_variantCombo->setObjectName("variantCombo"); m_variantCombo->setEnabled(false);
     m_landingDirection = new WrappingLabel;
     UiText::bind(m_landingDirection, "text", QT_TRANSLATE_NOOP("App", "—"));
-    m_landingDirection->setWordWrap(true);
     UiText::row(form, QT_TRANSLATE_NOOP("App", "Вариант:"), m_variantCombo);
     UiText::row(form, QT_TRANSLATE_NOOP("App", "Преобразование:"), m_landingDirection);
-    variantLayout->addLayout(form);
-    variantLayout->addStretch();
-
-    contentLayout->addWidget(archiveGroup, 1);
-    contentLayout->addWidget(variantGroup, 1);
-    outer->addWidget(content, 1);
-
-    auto* actionHint = new WrappingLabel;
-    UiText::bind(actionHint, "text", QT_TRANSLATE_NOOP("App", "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
-    actionHint->setWordWrap(true);
-    outer->addWidget(actionHint);
+    variantText->addLayout(form); variantText->addStretch();
+    variantLayout->addWidget(new WorkScrollArea(variantBody), 1);
     auto* beginButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
     beginButton->setFullCaption(true);
     m_beginButton = beginButton;
     UiText::bind(m_beginButton, "toolTip", QT_TRANSLATE_NOOP("App", "Создать работу"));
-    m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
-    m_beginButton->setEnabled(false);
-    m_beginButton->setDefault(true);
-    m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    auto* openProgressButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
-    UiText::bind(openProgressButton, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
-    openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
-    openProgressButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
+    m_beginButton->setObjectName("beginWorkButton"); m_beginButton->setEnabled(false);
+    m_beginButton->setDefault(true); m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
+    auto* open = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть работу…"));
+    UiText::bind(open, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть работу…"));
+    open->setObjectName("openProgressButton"); open->setIcon(AppIcons::icon(AppIcons::Kind::Open));
+    auto* variantActions = new QHBoxLayout;
+    variantActions->addWidget(m_beginButton); variantActions->addStretch(); variantActions->addWidget(open);
+    variantLayout->addLayout(variantActions);
+    cards->addWidget(archiveGroup, 1); cards->addWidget(variantGroup, 1);
+    outer->addWidget(content, 1);
     connect(archiveButton, &QPushButton::clicked, this, &MainWindow::chooseArchive);
-    connect(m_variantCombo, &QComboBox::currentIndexChanged,
-            this, &MainWindow::updateVariantSelection);
+    connect(m_variantCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateVariantSelection);
     connect(m_beginButton, &QPushButton::clicked, this, &MainWindow::beginWork);
-    connect(openProgressButton, &QPushButton::clicked, this, &MainWindow::openProgress);
-    m_landingScroll = new WorkScrollArea(page);
-    m_landingFooter = new QWidget;
-    m_landingFooter->setObjectName("landingActions");
-    auto* footer = new QHBoxLayout(m_landingFooter);
-    footer->setContentsMargins(20, 8, 20, 16);
-    footer->addWidget(m_beginButton);
-    footer->addStretch(1);
-    footer->addWidget(openProgressButton);
-    footer->addWidget(archiveButton);
-    auto* container = new QWidget;
-    auto* containerLayout = new QVBoxLayout(container);
-    containerLayout->setContentsMargins(0, 0, 0, 0);
-    containerLayout->setSpacing(0);
-    containerLayout->addWidget(m_landingScroll, 1);
-    containerLayout->addWidget(m_landingFooter);
-    return container;
+    connect(open, &QPushButton::clicked, this, &MainWindow::openProgress);
+    return m_landingPage;
 }
 
 QWidget* MainWindow::createWorkspacePage() {
@@ -296,73 +252,37 @@ QWidget* MainWindow::createStartPage() {
     auto* page = new QWidget;
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
-    layout->setSpacing(12);
-    m_directionLabel = new QLabel;
-    QFont directionFont = m_directionLabel->font();
-    directionFont.setPointSize(15);
-    directionFont.setBold(true);
-    m_directionLabel->setFont(directionFont);
-    m_directionLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    layout->addWidget(m_directionLabel);
-
     m_diagramLabel = new TaskImage;
     m_diagramLabel->setObjectName("startTaskImage");
-
-    auto* workPanel = new QWidget;
-    auto* right = new QVBoxLayout(workPanel);
-    right->setContentsMargins(0, 0, 0, 0);
-    right->setSpacing(14);
-    auto* instructionsGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Порядок работы"));
-    auto* instructionsLayout = new QVBoxLayout(instructionsGroup);
+    auto* explanation = new QWidget;
+    auto* textLayout = new QVBoxLayout(explanation);
+    textLayout->setContentsMargins(0, 0, 0, 0); textLayout->setSpacing(12);
+    m_startVariantLabel = new WrappingLabel;
+    m_startVariantLabel->setObjectName("startVariantInfo");
+    auto font = m_startVariantLabel->font(); font.setBold(true); m_startVariantLabel->setFont(font);
+    textLayout->addWidget(m_startVariantLabel);
     auto* instructions = new WrappingLabel;
-    UiText::bind(instructions, "text", QT_TRANSLATE_NOOP("App", "Изучите задание на рисунке и укажите размер исходного автомата. После правильного "
-        "ответа откроется последовательная работа с таблицей, матрицей и графом."));
-    instructions->setWordWrap(true);
-    instructionsLayout->addWidget(instructions);
-    right->addWidget(instructionsGroup);
-    auto* counts = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Проверьте структуру исходного автомата"));
-    auto* countLayout = new QFormLayout(counts);
-    countLayout->setObjectName("sourceCountsForm");
-    countLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    countLayout->setRowWrapPolicy(QFormLayout::DontWrapRows);
-    m_stateCount = new QSpinBox;
-    m_inputCount = new QSpinBox;
-    m_outputCount = new QSpinBox;
-    m_stateCount->setRange(1, 999999);
-    m_inputCount->setRange(1, 10);
-    m_outputCount->setRange(1, 10);
-    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество состояний:"), m_stateCount);
-    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество входных сигналов:"), m_inputCount);
-    UiText::row(countLayout, QT_TRANSLATE_NOOP("App", "Количество выходных сигналов:"), m_outputCount);
-    auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
-    accept->setObjectName(QStringLiteral("acceptCountsButton"));
-    accept->setDefault(true);
-    accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    right->addWidget(counts);
-    right->addStretch();
-    m_startWorkScroll = new WorkScrollArea(workPanel);
+    instructions->setObjectName("workInstructions");
+    UiText::bind(instructions, "text", QT_TRANSLATE_NOOP("App", "Изучите изображение задания. Нажмите «Продолжить», чтобы перейти к таблице автомата Мура.\n\n"
+        "В таблице Мура укажите количества состояний, входных и выходных сигналов и примите размеры. Заполните входы x0…x9, выходы y0…y9 и переходы между состояниями a0, a1, …; a0 всегда начальное. «-» обозначает отсутствие перехода или выхода.\n\n"
+        "Принимайте представления по порядку: таблица, матрица A и граф Мура, затем таблица, матрица B и граф эквивалентного автомата Мили. Следующий этап откроется после правильного выполнения предыдущего.\n\n"
+        "Каждое представление проверяется по реакции варианта из a0. Для Мура сравнивается выход до перехода, для Мили — выход на переходе. Совпадение конечной реакции не доказывает эквивалентность на всех входных последовательностях.\n\n"
+        "Подсказку можно уменьшить или скрыть разделителем. Примеры ввода доступны при наведении на ячейки. Ctrl+S сохраняет работу; в конце заполните сведения об участниках и создайте отчёт."));
+    textLayout->addWidget(instructions); textLayout->addStretch();
+    m_startWorkScroll = new WorkScrollArea(explanation);
     m_startWorkScroll->setObjectName("startWorkArea");
-    auto* workContainer = new QWidget;
-    auto* workLayout = new QVBoxLayout(workContainer);
+    auto* work = new QWidget;
+    auto* workLayout = new QVBoxLayout(work);
     workLayout->setContentsMargins(0, 0, 0, 0);
     workLayout->addWidget(m_startWorkScroll, 1);
-    auto* actions = new ActionBar;
-    actions->addWidget(accept);
-    workLayout->addWidget(actions);
-    m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, workContainer,
+    auto* next = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Продолжить"));
+    next->setObjectName("continueWorkButton"); next->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
+    auto* actions = new ActionBar; actions->addWidget(next); workLayout->addWidget(actions);
+    m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, work,
                                       "startAssignment", Qt::Horizontal);
+    m_startSplitter->setWorkTitle(QT_TRANSLATE_NOOP("App", "Пояснения к работе"));
     layout->addWidget(m_startSplitter, 1);
-    connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
-    auto invalidate = [this] {
-        if (!m_countsAccepted) return;
-        m_countsAccepted = false;
-        m_sourceEditor->resetEditor();
-        m_targetEditor->resetEditor();
-        updateWorkflowState();
-    };
-    connect(m_stateCount, &QSpinBox::valueChanged, this, invalidate);
-    connect(m_inputCount, &QSpinBox::valueChanged, this, invalidate);
-    connect(m_outputCount, &QSpinBox::valueChanged, this, invalidate);
+    connect(next, &QPushButton::clicked, this, &MainWindow::continueWork);
     return page;
 }
 
@@ -458,8 +378,7 @@ bool MainWindow::loadArchive(const QString& path, bool showErrors) {
 void MainWindow::applyArchive(const QString& path, const QList<TrainingVariant>& variants) {
     m_archivePath = QFileInfo(path).absoluteFilePath();
     m_variants = variants;
-    m_archivePathLabel->setText(QFileInfo(path).fileName());
-    m_archivePathLabel->setToolTip(m_archivePath);
+    refreshArchiveInfo();
     m_variantCombo->blockSignals(true);
     m_variantCombo->clear();
     int firstAvailable = -1;
@@ -505,15 +424,12 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
     }
     m_currentVariant = variant;
     m_hasVariant = true;
-    m_countsAccepted = false;
+    m_introCompleted = false;
     m_variantTitle->setText(tr("Вариант №%1 — %2")
         .arg(variant.number).arg(conversionDirectionName(variant.direction)));
-    m_directionLabel->setText(conversionDirectionName(variant.direction));
+    refreshVariantInfo();
     m_diagramLabel->setImageData(variant.diagram);
     m_notification->clearMessage();
-    m_stateCount->setValue(1);
-    m_inputCount->setValue(1);
-    m_outputCount->setValue(1);
     m_sourceEditor->setTask(variant, AutomatonKind::Moore);
     m_targetEditor->setTask(variant, AutomatonKind::Mealy);
     m_workflowTabs->setCurrentIndex(0);
@@ -530,53 +446,30 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
 
 void MainWindow::fitStartPage() {
     if (m_workflowTabs->currentIndex() != 0) return;
-    const auto* controls = m_startWorkScroll->widget()->layout();
-    const int workWidth = startWorkWidth();
-    m_startSplitter->setHintExtent(qMax(m_startSplitter->widget(0)->minimumWidth(),
-        m_startSplitter->width() - m_startSplitter->handleWidth() - workWidth));
-    if (m_workspaceSizeApplied) return;
-    m_workspaceSizeApplied = true;
-    // Once shown, native controls and wrapped instructions have their final metrics.
-    const int contentHeight = qMax(controls->minimumSize().height(),
-        controls->minimumHeightForWidth(m_startWorkScroll->viewport()->width()));
-    const int heightNeeded = height() - m_startWorkScroll->viewport()->height() + contentHeight;
-    const auto available = screen()->availableGeometry();
-    const auto decorationSize = frameGeometry().size() - size();
-    resize(width(), qMin(qMax(height(), heightNeeded), available.height() - decorationSize.height()));
-    const auto frame = frameGeometry();
-    const int top = qBound(available.top(), frame.top(), qMax(available.top(), available.bottom() - frame.height() + 1));
-    move(pos() + QPoint(0, top - frame.top()));
+    m_startSplitter->setHintExtent((m_startSplitter->width() - m_startSplitter->handleWidth()) / 2);
 }
 
-int MainWindow::startWorkWidth() const {
-    auto* group = m_startSplitter->widget(1);
-    const auto frame = group->contentsMargins();
-    const auto padding = group->layout()->contentsMargins();
-    return m_startWorkScroll->widget()->layout()->minimumSize().width() +
-        style()->pixelMetric(QStyle::PM_ScrollBarExtent) + frame.left() + frame.right() + padding.left() + padding.right();
-}
-
-void MainWindow::acceptCounts() {
+void MainWindow::continueWork() {
     if (!m_hasVariant) return;
-    const auto& source = m_currentVariant.moore;
-    const bool correct = m_stateCount->value() == source.states &&
-                         m_inputCount->value() == source.inputs &&
-                         m_outputCount->value() == source.outputs;
-    if (!correct) {
-        m_countsAccepted = false;
-        setFeedback(Message(QT_TRANSLATE_NOOP("Result", "Неверно. Введённые данные не соответствуют варианту.")), false);
-        updateWorkflowState();
-        return;
-    }
-    m_countsAccepted = true;
-    setFeedback(Message(QT_TRANSLATE_NOOP("Result", "Верно. Введённые данные соответствуют варианту.")), true);
+    m_introCompleted = true;
     updateWorkflowState();
     m_workflowTabs->setCurrentIndex(1);
 }
 
+void MainWindow::refreshArchiveInfo() {
+    m_archivePathLabel->setText(m_archivePath.isEmpty() ? tr("Архив не открыт") :
+        tr("%1\nВариантов: %2").arg(QFileInfo(m_archivePath).fileName()).arg(m_variants.size()));
+    m_archivePathLabel->setToolTip(m_archivePath);
+}
+
+void MainWindow::refreshVariantInfo() {
+    m_startVariantLabel->setText(m_hasVariant ? tr("Вариант №%1\nПреобразование: %2")
+        .arg(m_currentVariant.number).arg(conversionDirectionName(m_currentVariant.direction)) : QString());
+}
+
 void MainWindow::updateWorkflowState() {
-    m_workflowTabs->setTabEnabled(1, m_countsAccepted);
-    const bool sourceComplete = m_countsAccepted && m_sourceEditor->completed();
+    m_workflowTabs->setTabEnabled(1, m_introCompleted);
+    const bool sourceComplete = m_introCompleted && m_sourceEditor->completed();
     m_workflowTabs->setTabEnabled(2, sourceComplete);
     const bool targetComplete = sourceComplete && m_targetEditor->completed();
     m_workflowTabs->setTabEnabled(3, targetComplete);
@@ -595,10 +488,7 @@ QJsonObject MainWindow::progressData() const {
     QJsonObject data;
     data.insert(QStringLiteral("archivePath"), m_archivePath);
     data.insert(QStringLiteral("variantNumber"), m_currentVariant.number);
-    data.insert(QStringLiteral("countsAccepted"), m_countsAccepted);
-    data.insert(QStringLiteral("stateCount"), m_stateCount->value());
-    data.insert(QStringLiteral("inputCount"), m_inputCount->value());
-    data.insert(QStringLiteral("outputCount"), m_outputCount->value());
+    data.insert("introCompleted", m_introCompleted);
     data.insert(QStringLiteral("source"), m_sourceEditor->toJson());
     data.insert(QStringLiteral("target"), m_targetEditor->toJson());
     QJsonObject report;
@@ -621,7 +511,6 @@ void MainWindow::commitPendingInput() {
     if (auto* focus = QApplication::focusWidget())
         if (m_sourceEditor->isAncestorOf(focus) || m_targetEditor->isAncestorOf(focus))
             m_workflowTabs->setFocus();
-    for (auto* count : {m_stateCount, m_inputCount, m_outputCount}) count->interpretText();
 }
 
 bool MainWindow::hasUnsavedChanges() const {
@@ -716,14 +605,16 @@ bool MainWindow::restoreProgress(const QJsonObject& data, const QString& progres
     Logger::instance().log(archiveResult);
     applyArchive(archivePath, variants);
     if (!setupWorkspace(*found)) return false;
-    m_stateCount->setValue(data.value(QStringLiteral("stateCount")).toInt(1));
-    m_inputCount->setValue(data.value(QStringLiteral("inputCount")).toInt(1));
-    m_outputCount->setValue(data.value(QStringLiteral("outputCount")).toInt(1));
-    m_countsAccepted = data.value(QStringLiteral("countsAccepted")).toBool() &&
-        m_stateCount->value() == m_currentVariant.moore.states &&
-        m_inputCount->value() == m_currentVariant.moore.inputs &&
-        m_outputCount->value() == m_currentVariant.moore.outputs;
-    m_sourceEditor->fromJson(data.value(QStringLiteral("source")).toObject());
+    m_introCompleted = data.contains("introCompleted") ? data.value("introCompleted").toBool() :
+        data.value("countsAccepted").toBool();
+    auto sourceData = data.value("source").toObject();
+    if (!sourceData.contains("mooreSetup")) {
+        const auto& counts = m_currentVariant.moore;
+        sourceData.insert("mooreSetup", QJsonObject{{"states", data.value("stateCount").toInt(counts.states)},
+            {"inputs", data.value("inputCount").toInt(counts.inputs)}, {"outputs", data.value("outputCount").toInt(counts.outputs)},
+            {"accepted", data.value("countsAccepted").toBool()}});
+    }
+    m_sourceEditor->fromJson(sourceData);
     m_targetEditor->fromJson(data.value(QStringLiteral("target")).toObject());
     const QJsonObject report = data.value(QStringLiteral("report")).toObject();
     m_teacherName->setText(report.value(QStringLiteral("teacherName")).toString());
@@ -793,10 +684,6 @@ QString MainWindow::reportHtml() const {
     return html;
 }
 
-void MainWindow::setFeedback(const Message& text, bool success) {
-    showResult(success ? Result::success(text, ResultCategory::Validation) : Result::error(text, ResultCategory::Validation));
-}
-
 void MainWindow::showResult(const Result& result) {
     if (result.message().isEmpty()) return;
     Logger::instance().log(result);
@@ -817,6 +704,8 @@ void MainWindow::openLog() {
 void MainWindow::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
     if (m_ready && event->type() == QEvent::LanguageChange) refreshTexts();
+    if (m_ready && (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange))
+        m_landingLogo->setPixmap(AppIcons::icon(AppIcons::Kind::Swap).pixmap(72, 72));
 }
 void MainWindow::refreshTexts() {
     if (!m_ready) return;
@@ -829,10 +718,10 @@ void MainWindow::refreshTexts() {
             ? tr("Вариант №%1").arg(m_variants[index].number)
             : tr("Вариант №%1 — Мили → Мура (в разработке)").arg(m_variants[index].number));
     updateVariantSelection(m_variantCombo->currentIndex());
-    if (!m_archivePath.isEmpty()) m_archivePathLabel->setText(QFileInfo(m_archivePath).fileName());
+    refreshArchiveInfo();
     if (m_hasVariant) {
         m_variantTitle->setText(tr("Вариант №%1 — %2").arg(m_currentVariant.number).arg(conversionDirectionName(m_currentVariant.direction)));
-        m_directionLabel->setText(conversionDirectionName(m_currentVariant.direction));
+        refreshVariantInfo();
     }
     m_sourceEditor->retranslateTexts(); m_targetEditor->retranslateTexts();
     if (m_lastResult) m_notification->updateMessageText(m_lastResult->text());
