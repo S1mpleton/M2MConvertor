@@ -6,7 +6,7 @@ class ActionBar : public QWidget {
     Q_OBJECT
 public:
     explicit ActionBar(Qt::Alignment alignment = Qt::AlignRight, QWidget* parent = nullptr);
-    void addWidget(QWidget* widget);
+    void addWidget(QWidget* widget, Qt::Alignment singleRowAlignment = {});
 
 protected:
     bool event(QEvent* event) override;

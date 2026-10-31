@@ -7,6 +7,7 @@ class WorkScrollArea : public QScrollArea {
     Q_OBJECT
   public:
     explicit WorkScrollArea(QWidget* content, QWidget* parent = nullptr);
+    QSize minimumSizeHint() const override { return QSize(0, 0); }
 
   protected:
     bool eventFilter(QObject*, QEvent*) override;

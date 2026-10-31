@@ -44,6 +44,7 @@ private:
     void createMenus();
     void applyInitialSize();
     void fitStartPage();
+    int startWorkWidth() const;
     void refreshTexts();
     void showResult(const Result& result);
     void displayResult(const Result& result);

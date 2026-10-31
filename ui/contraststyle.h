@@ -1,6 +1,11 @@
 #pragma once
 #include <QProxyStyle>
 
+namespace TableStyle {
+inline constexpr qreal borderWidth = 1.5;
+QColor borderColor(const QPalette& palette);
+}
+
 // Preserve native controls and palette, adding a restrained outline where styles
 // otherwise make adjacent controls and table cells hard to distinguish.
 class ContrastStyle final : public QProxyStyle {

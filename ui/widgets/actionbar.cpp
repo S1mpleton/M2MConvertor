@@ -2,6 +2,7 @@
 #include <QLayout>
 #include <QEvent>
 #include <QVector>
+#include <QVariant>
 
 namespace {
 class ActionLayout final : public QLayout {
@@ -60,9 +61,14 @@ private:
             }
             const int extra = qMax(0, rect.width() - rowWidth);
             qreal x = rect.x(), gap = spacing();
-            if (m_alignment & Qt::AlignRight) x += extra;
-            else if (m_alignment & Qt::AlignHCenter) x += extra / 2.0;
-            else if ((m_alignment & Qt::AlignJustify) && last - first > 1)
+            auto alignment = m_alignment;
+            if (last - first == 1 && m_items[first]->widget()) {
+                const auto specific = m_items[first]->widget()->property("singleRowAlignment").toInt();
+                if (specific) alignment = Qt::Alignment(specific);
+            }
+            if (alignment & Qt::AlignRight) x += extra;
+            else if (alignment & Qt::AlignHCenter) x += extra / 2.0;
+            else if ((alignment & Qt::AlignJustify) && last - first > 1)
                 gap += qreal(extra) / (last - first - 1);
             if (apply) {
                 for (int index = first; index < last; ++index) {
@@ -88,7 +94,8 @@ ActionBar::ActionBar(Qt::Alignment alignment, QWidget* parent) : QWidget(parent)
     policy.setHeightForWidth(true);
     setSizePolicy(policy);
 }
-void ActionBar::addWidget(QWidget* widget) {
+void ActionBar::addWidget(QWidget* widget, Qt::Alignment singleRowAlignment) {
+    widget->setProperty("singleRowAlignment", int(singleRowAlignment));
     layout()->addWidget(widget);
     updateRequiredHeight();
 }

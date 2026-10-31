@@ -6,4 +6,5 @@ class PlainCellDelegate : public QStyledItemDelegate {
   public:
     explicit PlainCellDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
     void setModelData(QWidget*, QAbstractItemModel*, const QModelIndex&) const override;
+    void paint(QPainter*, const QStyleOptionViewItem&, const QModelIndex&) const override;
 };

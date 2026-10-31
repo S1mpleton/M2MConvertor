@@ -19,6 +19,7 @@
 #include <QTimer>
 #include "ui/widgets/workscrollarea.h"
 #include "ui/widgets/actionbar.h"
+#include "ui/widgets/elidingbutton.h"
 #include "ui/workflowtabs.h"
 #include "ui/appicons.h"
 
@@ -110,7 +111,7 @@ void MainWindow::applyInitialSize() {
     const QSize frame = frameGeometry().size() - size();
     const QSize limit = available.size() - frame;
     const auto* controlLayout = m_startWorkScroll->widget()->layout();
-    const int workWidth = controlLayout->minimumSize().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    const int workWidth = startWorkWidth();
     const auto startMargins = m_startSplitter->parentWidget()->layout()->contentsMargins();
     const auto workspaceMargins = m_workflowTabs->parentWidget()->layout()->contentsMargins();
     const int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth) * 2;
@@ -132,7 +133,7 @@ void MainWindow::applyInitialSize() {
     const auto* landingLayout = m_landingScroll->widget()->layout();
     const int landingHeight = qMax(landingLayout->minimumSize().height(),
         landingLayout->minimumHeightForWidth(m_landingScroll->viewport()->width()));
-    const int footerHeight = m_landingFooter->heightForWidth(targetWidth);
+    const int footerHeight = qMax(m_landingFooter->minimumSizeHint().height(), m_landingFooter->heightForWidth(targetWidth));
     const int height = qMax(landingHeight + menuBar()->height() + footerHeight, workHeight);
     resize(targetWidth, qMin(height, limit.height()));
     if (isVisible()) {
@@ -180,7 +181,8 @@ QWidget* MainWindow::createLandingPage() {
     UiText::bind(m_archivePathLabel, "text", QT_TRANSLATE_NOOP("App", "BazaVar не выбран"));
     m_archivePathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_archivePathLabel->setWordWrap(true);
-    auto* archiveButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть BazaVar…"));
+    auto* archiveButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
+    UiText::bind(archiveButton, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
     archiveButton->setObjectName(QStringLiteral("openArchiveButton"));
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     archiveLayout->addWidget(m_archivePathLabel);
@@ -216,19 +218,18 @@ QWidget* MainWindow::createLandingPage() {
     UiText::bind(actionHint, "text", QT_TRANSLATE_NOOP("App", "Создайте новую работу для выбранного варианта или продолжите ранее сохранённую."));
     actionHint->setWordWrap(true);
     outer->addWidget(actionHint);
-    auto* actions = new ActionBar(Qt::AlignHCenter);
-    actions->setObjectName("landingActions");
-    m_beginButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
+    auto* beginButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
+    beginButton->setFullCaption(true);
+    m_beginButton = beginButton;
+    UiText::bind(m_beginButton, "toolTip", QT_TRANSLATE_NOOP("App", "Создать работу"));
     m_beginButton->setObjectName(QStringLiteral("beginWorkButton"));
     m_beginButton->setEnabled(false);
     m_beginButton->setDefault(true);
     m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    auto* openProgressButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
+    auto* openProgressButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
+    UiText::bind(openProgressButton, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть сохранённую работу…"));
     openProgressButton->setObjectName(QStringLiteral("openProgressButton"));
     openProgressButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
-    actions->addWidget(archiveButton);
-    actions->addWidget(m_beginButton);
-    actions->addWidget(openProgressButton);
     connect(archiveButton, &QPushButton::clicked, this, &MainWindow::chooseArchive);
     connect(m_variantCombo, &QComboBox::currentIndexChanged,
             this, &MainWindow::updateVariantSelection);
@@ -236,9 +237,13 @@ QWidget* MainWindow::createLandingPage() {
     connect(openProgressButton, &QPushButton::clicked, this, &MainWindow::openProgress);
     m_landingScroll = new WorkScrollArea(page);
     m_landingFooter = new QWidget;
-    auto* footer = new QVBoxLayout(m_landingFooter);
+    m_landingFooter->setObjectName("landingActions");
+    auto* footer = new QHBoxLayout(m_landingFooter);
     footer->setContentsMargins(20, 8, 20, 16);
-    footer->addWidget(actions);
+    footer->addWidget(m_beginButton);
+    footer->addStretch(1);
+    footer->addWidget(openProgressButton);
+    footer->addWidget(archiveButton);
     auto* container = new QWidget;
     auto* containerLayout = new QVBoxLayout(container);
     containerLayout->setContentsMargins(0, 0, 0, 0);
@@ -338,12 +343,16 @@ QWidget* MainWindow::createStartPage() {
     right->addStretch();
     m_startWorkScroll = new WorkScrollArea(workPanel);
     m_startWorkScroll->setObjectName("startWorkArea");
-    m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, m_startWorkScroll,
-                                      "startAssignment", Qt::Horizontal);
-    layout->addWidget(m_startSplitter, 1);
+    auto* workContainer = new QWidget;
+    auto* workLayout = new QVBoxLayout(workContainer);
+    workLayout->setContentsMargins(0, 0, 0, 0);
+    workLayout->addWidget(m_startWorkScroll, 1);
     auto* actions = new ActionBar;
     actions->addWidget(accept);
-    layout->addWidget(actions);
+    workLayout->addWidget(actions);
+    m_startSplitter = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_diagramLabel, workContainer,
+                                      "startAssignment", Qt::Horizontal);
+    layout->addWidget(m_startSplitter, 1);
     connect(accept, &QPushButton::clicked, this, &MainWindow::acceptCounts);
     auto invalidate = [this] {
         if (!m_countsAccepted) return;
@@ -403,7 +412,7 @@ void MainWindow::createMenus() {
     m_saveAsAction->setEnabled(false);
     auto* settings = UiText::menu(menuBar(), AppIcons::icon(AppIcons::Kind::Settings), QT_TRANSLATE_NOOP("App", "Настройки"));
     settings->setObjectName("settingsMenu");
-    auto* logAction = UiText::action(settings, AppIcons::icon(AppIcons::Kind::Log), QT_TRANSLATE_NOOP("App", "Журнал событий…"));
+    auto* logAction = UiText::action(settings, AppIcons::icon(AppIcons::Kind::Log), QT_TRANSLATE_NOOP("App", "Журнал событий"));
     logAction->setObjectName("eventLogAction");
     connect(logAction, &QAction::triggered, this, &MainWindow::openLog);
     auto* languages = settings->addMenu(AppIcons::icon(AppIcons::Kind::Language), QString());
@@ -521,7 +530,7 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
 void MainWindow::fitStartPage() {
     if (m_workflowTabs->currentIndex() != 0) return;
     const auto* controls = m_startWorkScroll->widget()->layout();
-    const int workWidth = controls->minimumSize().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    const int workWidth = startWorkWidth();
     m_startSplitter->setHintExtent(qMax(m_startSplitter->widget(0)->minimumWidth(),
         m_startSplitter->width() - m_startSplitter->handleWidth() - workWidth));
     if (m_workspaceSizeApplied) return;
@@ -536,6 +545,14 @@ void MainWindow::fitStartPage() {
     const auto frame = frameGeometry();
     const int top = qBound(available.top(), frame.top(), qMax(available.top(), available.bottom() - frame.height() + 1));
     move(pos() + QPoint(0, top - frame.top()));
+}
+
+int MainWindow::startWorkWidth() const {
+    auto* group = m_startSplitter->widget(1);
+    const auto frame = group->contentsMargins();
+    const auto padding = group->layout()->contentsMargins();
+    return m_startWorkScroll->widget()->layout()->minimumSize().width() +
+        style()->pixelMetric(QStyle::PM_ScrollBarExtent) + frame.left() + frame.right() + padding.left() + padding.right();
 }
 
 void MainWindow::acceptCounts() {

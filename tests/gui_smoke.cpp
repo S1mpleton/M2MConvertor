@@ -49,6 +49,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QStackedWidget>
 #include <QTabWidget>
 #include <QTest>
@@ -207,13 +208,16 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(source->toJson().value("tableAccepted").toBool(), "table with final loop is also accepted");
     auto* matrix = source->findChild<QTableWidget*>("transitionMatrix");
     auto* outputs = source->findChild<QTableWidget*>("matrixOutputs");
-    auto* dimension = source->findChild<QLineEdit*>("matrixDimensionEdit");
+    auto* dimension = source->findChild<QSpinBox*>("matrixDimensionEdit");
     auto* build = source->findChild<QPushButton*>("configureMatrixButton");
     auto* clear = source->findChild<QPushButton*>("clearMatrixButton");
-    require(matrix->rowCount() == 0 && outputs->rowCount() == 0 && dimension->text().isEmpty() && !clear->isEnabled(),
+    require(matrix->rowCount() == 0 && outputs->rowCount() == 0 && dimension->value() == 0 && !clear->isEnabled(),
         "matrix waits for the user's dimension instead of building from the table");
-    for (const auto& invalid : {"text", "1.5", "0", "2"}) {
-        dimension->setText(invalid); build->click();
+    auto* numericEdit = dimension->findChild<QLineEdit*>();
+    numericEdit->selectAll(); QTest::keyClicks(numericEdit, "abc");
+    require(!numericEdit->text().contains("abc"), "matrix dimension rejects letters");
+    for (const int invalid : {0, 2}) {
+        dimension->setValue(invalid); build->click();
         require(matrix->rowCount() == 0, "invalid or mismatched dimensions do not create a matrix");
     }
     {
@@ -221,9 +225,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         require(MainWindowTestAccess::restore(draft, MainWindowTestAccess::progress(window)), "work waiting for a matrix dimension restores");
         auto* restoredEditor = draft.findChild<AutomatonEditor*>("sourceEditor");
         require(restoredEditor->findChild<QTableWidget*>("transitionMatrix")->rowCount() == 0 &&
-            restoredEditor->findChild<QLineEdit*>("matrixDimensionEdit")->text() == "2", "restoring does not auto-build an unfinished matrix");
+            restoredEditor->findChild<QSpinBox*>("matrixDimensionEdit")->value() == 2, "restoring does not auto-build an unfinished matrix");
     }
-    dimension->setText("1"); build->click();
+    dimension->setValue(1); numericEdit->setFocus(); QTest::keyClick(numericEdit, Qt::Key_Return);
     require(hoverHelp(matrix, 0, 0).contains("x0, x2") && hoverHelp(outputs, 0, 1).contains("y0, y2"),
         "Moore matrices show separate edge-input and output examples");
     require(hoverHelp(source->findChild<QTableWidget*>("matrixReference"), 4, 1).contains("только для просмотра"),
@@ -278,6 +282,35 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     divider->setExpanded(false); QApplication::processEvents();
     require(divider->hintExtent() == 0 && source->completed(), "hiding graph reference keeps acceptance");
     auto* t = target->findChild<QTableWidget*>("transitionTable");
+    require(t->rowCount() == 0 && !target->findChild<QPushButton*>("acceptTableButton")->isEnabled(),
+        "Mealy table waits for all three numeric counts");
+    auto* states = target->findChild<QSpinBox*>("mealyStateCount");
+    auto* inputs = target->findChild<QSpinBox*>("mealyInputCount");
+    auto* outputsCount = target->findChild<QSpinBox*>("mealyOutputCount");
+    states->setValue(2); inputs->setValue(1); outputsCount->setValue(1);
+    target->findChild<QPushButton*>("configureTableButton")->click();
+    require(t->rowCount() == 0, "mismatched Mealy counts do not build a table");
+    states->setValue(1); inputs->setValue(2);
+    target->findChild<QPushButton*>("configureTableButton")->click();
+    require(t->rowCount() == 0, "Mealy input count is checked before building");
+    inputs->setValue(1); outputsCount->setValue(2);
+    target->findChild<QPushButton*>("configureTableButton")->click();
+    require(t->rowCount() == 0, "Mealy output count is checked before building");
+    states->setValue(2); outputsCount->setValue(1);
+    {
+        MainWindow draft;
+        require(MainWindowTestAccess::restore(draft, MainWindowTestAccess::progress(window)), "unbuilt Mealy setup restores");
+        auto* restoredTarget = draft.findChild<AutomatonEditor*>("targetEditor");
+        require(restoredTarget->findChild<QSpinBox*>("mealyStateCount")->value() == 2 &&
+            restoredTarget->findChild<QTableWidget*>("transitionTable")->rowCount() == 0, "Mealy setup draft remains unbuilt after restoring");
+    }
+    states->setValue(1); target->findChild<QPushButton*>("configureTableButton")->click();
+    t->item(2, 0)->setText("x9");
+    target->findChild<QPushButton*>("configureTableButton")->click();
+    require(t->item(2, 0)->text() == "x9", "accepting unchanged Mealy counts preserves entered cells");
+    target->findChild<QPushButton*>("clearTableButton")->click();
+    require(t->item(2, 0)->text().isEmpty() && t->item(2, 1)->text() == "-/-" && states->value() == 1,
+        "clearing a Mealy table keeps its accepted dimensions");
     require(t->item(2, 1)->text() == "-/-", "Mealy transitions default to -/-");
     workflow->setCurrentIndex(2); QApplication::processEvents();
     require(hoverHelp(t, 2, 1).contains("a0 / y0, y2") && hoverHelp(t, 2, 1).contains("-/-"),
@@ -327,7 +360,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     target->findChild<QPushButton*>("acceptTableButton")->click();
     require(target->toJson().value("tableAccepted").toBool(), "Mealy table accepted");
     require(target->findChild<QTableWidget*>("transitionMatrix")->rowCount() == 0, "Mealy matrix also waits for a dimension");
-    target->findChild<QLineEdit*>("matrixDimensionEdit")->setText("1");
+    target->findChild<QSpinBox*>("matrixDimensionEdit")->setValue(1);
     target->findChild<QPushButton*>("configureMatrixButton")->click();
     require(hoverHelp(target->findChild<QTableWidget*>("transitionMatrix"), 0, 0).contains("x0 / y0, y2; x1 / -"),
         "Mealy matrix shows semicolon-separated edge examples");
@@ -396,10 +429,15 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
                 representation->setCurrentIndex(tab); QApplication::processEvents(); QApplication::processEvents();
                 auto* active = representation->currentWidget();
                 require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
-                const QStringList names = tab == 0 ? QStringList{"acceptTableButton"} : tab == 1 ?
+                const QStringList names = tab == 0 ? (editor == 0 ? QStringList{"acceptTableButton"} :
+                    QStringList{"clearTableButton", "configureTableButton", "acceptTableButton"}) : tab == 1 ?
                     QStringList{"clearMatrixButton", "configureMatrixButton", "acceptMatrixButton"} :
                     QStringList{"createVertexButton", "deleteVertexButton", "acceptGraphButton"};
                 for (const auto& name : names) requireVisibleAction(&window, active->findChild<QPushButton*>(name));
+                auto* workFrame = qobject_cast<QGroupBox*>(active->findChild<HintSplitter*>()->widget(1));
+                require(workFrame && workFrame->title() == "Рабочая область" &&
+                    workFrame->isAncestorOf(active->findChild<QPushButton*>(names.last())),
+                    "work frame contains the editor and its pinned acceptance button");
                 if (auto* scroll = active->findChild<WorkScrollArea*>()) {
                     scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->maximum());
                     QApplication::processEvents();
@@ -432,6 +470,14 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(restoredSource->completed() &&
         restoredSource->findChild<QTableWidget*>("transitionTable")->item(4, 0)->text() == "x9",
         "version 2 drafts migrate and are rechecked");
+    auto legacyTarget = target->toJson();
+    legacyTarget.remove("mealySetup");
+    legacyTarget.insert("matrixDimension", "1");
+    auto* restoredTarget = restored.findChild<AutomatonEditor*>("targetEditor");
+    restoredTarget->fromJson(legacyTarget);
+    require(restoredTarget->completed() && restoredTarget->findChild<QSpinBox*>("mealyStateCount")->value() == 1 &&
+        restoredTarget->findChild<QSpinBox*>("matrixDimensionEdit")->value() == 1,
+        "old Mealy work restores its table and string matrix dimension");
     for (int i = 0; i < 20; ++i) graph->createVertex();
     require(graph->vertices().size() == 10, "graph is capped at ten states");
     source->findChild<QPushButton*>("deleteVertexButton")->click();
@@ -726,6 +772,9 @@ int main(int argc, char** argv) {
     auto* begin = window.findChild<QPushButton*>(QStringLiteral("beginWorkButton"));
     auto* openProgress = window.findChild<QPushButton*>(QStringLiteral("openProgressButton"));
     require(openArchive && begin && openProgress, "landing actions are available");
+    require(openArchive->text() == "Открыть архив вариантов…" &&
+        window.findChild<QAction*>("eventLogAction")->text() == "Журнал событий",
+        "archive and journal captions follow the requested names");
     require(openArchive->styleSheet().isEmpty() && begin->styleSheet().isEmpty(),
             "buttons keep the operating-system style");
     require(!begin->isEnabled(), "work cannot start before BazaVar and variant selection");
@@ -735,6 +784,11 @@ int main(int argc, char** argv) {
         for (const auto& size : {QSize(900, 500), QSize(480, 360), QSize(350, 300)}) {
             window.resize(size); QApplication::processEvents(); QApplication::processEvents();
             for (auto* button : {openArchive, begin, openProgress}) requireVisibleAction(&window, button);
+            const auto a = begin->mapTo(&window, QPoint());
+            const auto b = openProgress->mapTo(&window, QPoint());
+            const auto c = openArchive->mapTo(&window, QPoint());
+            require(a.x() < b.x() && b.x() < c.x() && a.y() == b.y() && b.y() == c.y(),
+                "landing actions keep their left/right order and one baseline");
         }
     }
     TranslationManager::instance().setLocale("ru_RU", false);

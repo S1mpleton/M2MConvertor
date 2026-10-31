@@ -22,12 +22,12 @@ class HintHandle : public QSplitterHandle {
   protected:
     void paintEvent(QPaintEvent*) override {
         // Do not paint the native handle: some themes fill its entire hit area.
-        // The parent page remains visible on both sides of this one-pixel track.
+        // The parent page remains visible on both sides of this three-pixel track.
         QPainter painter(this);
         const auto c = rect().center();
         auto track = palette().color(QPalette::WindowText);
-        track.setAlpha(80);
-        painter.setPen(track);
+        track.setAlpha(110);
+        painter.setPen(QPen(track, 3));
         if (orientation() == Qt::Vertical)
             painter.drawLine(0, c.y(), width() - 1, c.y());
         else
@@ -75,9 +75,14 @@ HintSplitter::HintSplitter(const char* title, QWidget* hint, QWidget* work, cons
     if (orientation == Qt::Vertical)
         group->setMinimumHeight(fontMetrics().height() + 88);
     else
-        group->setMinimumWidth(140);
+        group->setMinimumWidth(120);
     addWidget(group);
-    addWidget(work);
+    auto* workGroup = UiText::make<QGroupBox>(QT_TRANSLATE_NOOP("App", "Рабочая область"));
+    workGroup->setObjectName(name + "Work");
+    auto* workLayout = new QVBoxLayout(workGroup);
+    workLayout->setContentsMargins(8, 8, 8, 8);
+    workLayout->addWidget(work);
+    addWidget(workGroup);
     setCollapsible(0, true);
     setCollapsible(1, false);
     setStretchFactor(0, 0);

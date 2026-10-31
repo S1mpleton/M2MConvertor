@@ -15,6 +15,7 @@ class QPushButton;
 class QTableWidget;
 class QTabWidget;
 class QLineEdit;
+class QSpinBox;
 
 class AutomatonEditor : public QWidget {
     Q_OBJECT
@@ -43,6 +44,9 @@ private:
     QWidget* createMatrixPage();
     QWidget* createGraphPage();
     void configureTable();
+    void configureMealyTable();
+    void clearTable();
+    bool mealyCountsMatch() const;
     void fillEmptyCells(QTableWidget* table) const;
     int firstInputRow() const { return m_editorKind == AutomatonKind::Moore ? 4 : 2; }
     bool readTable(Automaton* result, Message* error) const;
@@ -76,6 +80,7 @@ private:
     bool m_matrixAccepted = false;
     bool m_graphAccepted = false;
     bool m_loading = false;
+    bool m_tableConfigured = false;
 
     QTabWidget* m_tabs;
     TaskImage* m_assignmentImage;
@@ -84,8 +89,15 @@ private:
     HintSplitter* m_graphPanel;
     QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
+    QWidget* m_tableContent;
+    QWidget* m_mealySetup;
+    QSpinBox* m_mealyStates;
+    QSpinBox* m_mealyInputs;
+    QSpinBox* m_mealyOutputs;
+    QPushButton* m_clearTableButton;
+    QPushButton* m_acceptTableButton;
 
-    QLineEdit* m_matrixDimension;
+    QSpinBox* m_matrixDimension;
     QWidget* m_matrixContent;
     QPushButton* m_clearMatrixButton;
     QPushButton* m_acceptMatrixButton;
