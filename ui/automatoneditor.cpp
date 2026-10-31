@@ -71,29 +71,14 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
 }
 
 QString AutomatonEditor::cellHelp(const QTableWidget* table, int row, int column) const {
-    const auto inputs = tr("Один входной сигнал: x0, x1, …, x9. Например: x0. Перечисления не допускаются.");
-    const auto outputs = tr("Выходные сигналы через запятую: y0 или y0, y2. «-» — нет выхода.");
-    const auto states = tr("Состояния создаются автоматически: a0, a1, …; a0 — начальное. Эта ячейка не редактируется.");
-    QString help;
     if (table == m_matrixTable) {
-        help = tr("Переход из a%1 в a%2. ").arg(row).arg(column);
-        help += m_editorKind == AutomatonKind::Moore
-            ? tr("Входы на дугах: x0 или x0, x2. «-» — нет перехода.")
-            : tr("Метки дуг: x0 / y0, y2; x1 / -. Разделяйте разные входы знаком «;». «-» — нет перехода.");
-    } else if (table == m_matrixOutputs) {
-        help = column == 0 ? states : outputs;
-    } else {
-        if (column == 0) help = inputs;
-        else if (m_editorKind == AutomatonKind::Moore && row <= 1) help = outputs;
-        else if (row < firstInputRow()) help = states;
-        else if (m_editorKind == AutomatonKind::Moore)
-            help = tr("Одно следующее состояние, например a0. Используйте только состояния из заголовка. «-» — нет перехода.");
-        else
-            help = tr("Следующее состояние / выходы: a0 / y0, y2 или a0 / -. Слева — одно состояние, справа — выходы через запятую. «-/-» — нет перехода.");
-        if (table != m_transitionTable)
-            help += "\n" + tr("Принятая таблица: только для просмотра.");
+        return m_editorKind == AutomatonKind::Moore ? "x0, x2\n-" : "x0 / y0, y2; x1 / -\n-";
     }
-    return help;
+    if (table == m_matrixOutputs) return column == 0 ? "a0" : "y0, y2\n-";
+    if (column == 0) return "x0";
+    if (m_editorKind == AutomatonKind::Moore && row <= 1) return "y0, y2\n-";
+    if (row < firstInputRow()) return "a0";
+    return m_editorKind == AutomatonKind::Moore ? "a0\n-" : "a0 / y0, y2\na1 / -\n-/-";
 }
 
 bool AutomatonEditor::eventFilter(QObject* object, QEvent* event) {
@@ -105,7 +90,7 @@ bool AutomatonEditor::eventFilter(QObject* object, QEvent* event) {
             const auto index = table->indexAt(help->pos());
             if (index.isValid()) {
                 const auto text = cellHelp(table, index.row(), index.column());
-                QToolTip::showText(help->globalPos(), "<qt>" + text.toHtmlEscaped().replace('\n', "<br>") + "</qt>",
+                QToolTip::showText(help->globalPos(), text,
                                    table->viewport(), table->visualRect(index));
             } else {
                 QToolTip::hideText();
@@ -170,7 +155,7 @@ QWidget* AutomatonEditor::createTablePage() {
     build->setObjectName("configureTableButton");
     build->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
     commandLayout->addWidget(build);
-    setup->addWidget(fields, Qt::AlignRight);
+    setup->addWidget(fields);
     workLayout->addWidget(setup);
     m_tableContent = new QWidget;
     auto* layout = new QVBoxLayout(m_tableContent);

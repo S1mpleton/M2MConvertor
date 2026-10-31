@@ -19,7 +19,6 @@
 #include <QTimer>
 #include "ui/widgets/workscrollarea.h"
 #include "ui/widgets/actionbar.h"
-#include "ui/widgets/elidingbutton.h"
 #include "ui/workflowtabs.h"
 #include "ui/appicons.h"
 
@@ -160,7 +159,7 @@ QWidget* MainWindow::createLandingPage() {
     archiveText->addWidget(m_archivePathLabel);
     archiveText->addStretch();
     archiveLayout->addWidget(new WorkScrollArea(archiveBody), 1);
-    auto* archiveButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
+    auto* archiveButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
     UiText::bind(archiveButton, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть архив вариантов…"));
     archiveButton->setObjectName("openArchiveButton");
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
@@ -187,13 +186,12 @@ QWidget* MainWindow::createLandingPage() {
     UiText::row(form, QT_TRANSLATE_NOOP("App", "Преобразование:"), m_landingDirection);
     variantText->addLayout(form); variantText->addStretch();
     variantLayout->addWidget(new WorkScrollArea(variantBody), 1);
-    auto* beginButton = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
-    beginButton->setFullCaption(true);
+    auto* beginButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Создать работу"));
     m_beginButton = beginButton;
     UiText::bind(m_beginButton, "toolTip", QT_TRANSLATE_NOOP("App", "Создать работу"));
     m_beginButton->setObjectName("beginWorkButton"); m_beginButton->setEnabled(false);
     m_beginButton->setDefault(true); m_beginButton->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    auto* open = UiText::make<ElidingButton>(QT_TRANSLATE_NOOP("App", "Открыть работу…"));
+    auto* open = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть работу…"));
     UiText::bind(open, "toolTip", QT_TRANSLATE_NOOP("App", "Открыть работу…"));
     open->setObjectName("openProgressButton"); open->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     auto* variantActions = new QHBoxLayout;

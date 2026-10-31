@@ -21,7 +21,7 @@ target_include_directories(M2MConvertorCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(M2MConvertorCore PUBLIC Qt::Core Qt::Gui OpenSSL::Crypto)
 
 add_library(M2MConvertorUi STATIC
-    ui/widgets/actionbar.cpp ui/widgets/actionbar.h ui/widgets/elidingbutton.h
+    ui/widgets/actionbar.cpp ui/widgets/actionbar.h
     ui/contraststyle.cpp ui/contraststyle.h
     infrastructure/translationmanager.cpp infrastructure/translationmanager.h
     ui/uitext.cpp ui/uitext.h ui/logwindow.cpp ui/logwindow.h ui/logwindow.ui

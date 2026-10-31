@@ -213,10 +213,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         table->item(4, 0)->text().isEmpty() && table->item(4, 1)->text() == "-",
         "table auto-generates canonical header, blank input and absent transitions");
     const auto answersBeforeHelp = source->answerData();
-    require(hoverHelp(table, 4, 0).contains("Один входной сигнал") &&
-        hoverHelp(table, 1, 1).contains("y0, y2") &&
-        hoverHelp(table, 4, 1).contains("Одно следующее состояние"),
-        "Moore cells show examples for inputs, outputs and destination states");
+    require(hoverHelp(table, 4, 0) == "x0" && hoverHelp(table, 1, 1) == "y0, y2\n-" &&
+        hoverHelp(table, 4, 1) == "a0\n-", "Moore cell hints contain input examples only");
     require(source->answerData() == answersBeforeHelp, "hovering never changes answers");
     table->editItem(table->item(4, 0)); QApplication::processEvents();
     auto* freeInput = table->findChild<QLineEdit*>();
@@ -269,8 +267,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     dimension->setValue(1); numericEdit->setFocus(); QTest::keyClick(numericEdit, Qt::Key_Return);
     require(hoverHelp(matrix, 0, 0).contains("x0, x2") && hoverHelp(outputs, 0, 1).contains("y0, y2"),
         "Moore matrices show separate edge-input and output examples");
-    require(hoverHelp(source->findChild<QTableWidget*>("matrixReference"), 4, 1).contains("только для просмотра"),
-        "accepted reference table explains that its cells are read-only");
+    require(hoverHelp(source->findChild<QTableWidget*>("matrixReference"), 4, 1) == "a0\n-",
+        "reference tables use the same short input examples");
     require(matrix->item(0, 0)->text() == "-", "matrix defaults to no transitions");
     outputs->item(0, 1)->setText("y4");
     matrix->selectAll(); outputs->selectAll();
@@ -433,8 +431,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() == "Work instructions" &&
         window.findChild<QLabel*>("archiveSummary")->text().contains("Variants: 2"),
         "new start and archive texts follow a live language switch");
-    require(hoverHelp(target->findChild<QTableWidget*>("graphReference"), 2, 1).contains("read-only"),
-        "cell hints follow a live language switch");
+    require(hoverHelp(target->findChild<QTableWidget*>("graphReference"), 2, 1) == "a0 / y0, y2\na1 / -\n-/-",
+        "cell hints remain input examples after a live language switch");
     require(!MainWindowTestAccess::dirty(window), "translated generated table headings do not create unsaved changes");
     if (!screenshot.isEmpty()) {
         window.grab().save(screenshot + ".english.png");
@@ -491,6 +489,27 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
                     require(clearTable->width() == configureTable->width() &&
                         clearTable->geometry().bottom() < configureTable->geometry().top(),
                         "Clear and Accept have equal widths and stay vertically stacked");
+                    auto* states = active->findChild<QSpinBox*>(editor == 0 ? "mooreStateCount" : "mealyStateCount");
+                    const auto buttons = clearTable->mapTo(active, QPoint());
+                    const auto fields = states->mapTo(active, QPoint());
+                    require(buttons.x() + clearTable->width() < fields.x() &&
+                        qAbs(clearTable->parentWidget()->mapTo(active, clearTable->parentWidget()->rect().center()).y() -
+                            states->parentWidget()->mapTo(active, states->parentWidget()->rect().center()).y()) <= 2,
+                        "table setup buttons stay beside the count fields when the window shrinks");
+                } else if (tab == 1) {
+                    auto* clearMatrix = active->findChild<QPushButton*>("clearMatrixButton");
+                    auto* dimensions = active->findChild<QSpinBox*>("matrixDimensionEdit");
+                    const auto clearCenter = clearMatrix->mapTo(active, clearMatrix->rect().center());
+                    const auto dimensionCenter = dimensions->mapTo(active, dimensions->rect().center());
+                    require(clearCenter.x() < dimensionCenter.x() && qAbs(clearCenter.y() - dimensionCenter.y()) <= 2,
+                        "matrix setup stays on one row when the window shrinks");
+                } else {
+                    auto* add = active->findChild<QPushButton*>("createVertexButton");
+                    auto* remove = active->findChild<QPushButton*>("deleteVertexButton");
+                    const auto first = add->mapTo(active, add->rect().center());
+                    const auto second = remove->mapTo(active, remove->rect().center());
+                    require(first.x() < second.x() && first.y() == second.y(),
+                        "graph controls stay on one row when the window shrinks");
                 }
                 auto* workFrame = qobject_cast<QGroupBox*>(active->findChild<HintSplitter*>()->widget(1));
                 require(workFrame && workFrame->title() == "Рабочая область" &&
@@ -716,6 +735,8 @@ void testHintDrag() {
     HintSplitter splitter("Подсказка", hint, work, "testDivider");
     splitter.resize(600, 500); splitter.show(); QApplication::processEvents();
     auto* handle = splitter.handle(1);
+    require(handle->toolTip() == "Потяните за границу, что бы изменить размер области",
+        "divider tooltip uses the requested short wording");
     const int stop = splitter.widget(0)->minimumHeight();
     auto moveTo = [&](int y) {
         const auto global = splitter.mapToGlobal(QPoint(splitter.width() / 2, y + splitter.handleWidth() / 2));

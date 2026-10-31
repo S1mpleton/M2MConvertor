@@ -34,17 +34,21 @@ class MenuStyle final : public QProxyStyle {
             QProxyStyle::drawControl(element, &background, painter, widget);
             auto textItem = *item;
             textItem.icon = QIcon();
-            textItem.rect.adjust(26, 0, -4, 0);
+            textItem.rect.adjust(22, 0, 0, 0);
+            // Match M2MTools: let the native style paint the caption's hover
+            // area as well as the full item, then use the live palette for text.
+            textItem.text.clear();
+            QProxyStyle::drawControl(element, &textItem, painter, widget);
             const auto colors = widget ? widget->palette() : textItem.palette;
             const bool enabled = textItem.state.testFlag(State_Enabled);
             painter->save();
             painter->setFont(textItem.font);
             painter->setPen(colors.color(enabled ? QPalette::Active : QPalette::Disabled,
                                          QPalette::WindowText));
-            int flags = Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine | Qt::TextShowMnemonic;
+            int flags = Qt::AlignCenter | Qt::TextSingleLine | Qt::TextShowMnemonic;
             if (!styleHint(SH_UnderlineShortcut, &textItem, widget))
                 flags |= Qt::TextHideMnemonic;
-            painter->drawText(textItem.rect, flags, textItem.text);
+            painter->drawText(textItem.rect, flags, item->text);
             painter->restore();
             item->icon.paint(painter,
                              QRect(item->rect.left() + 5, item->rect.center().y() - 8, 16, 16));

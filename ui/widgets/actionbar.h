@@ -1,16 +1,15 @@
 #pragma once
 #include <QWidget>
 
-// Fixed controls outside scrolling content; wrap whole controls on narrow windows.
+// Fixed controls outside scrolling content. Their full widths set the minimum
+// available width, so shrinking the window never rearranges an action row.
 class ActionBar : public QWidget {
     Q_OBJECT
 public:
     explicit ActionBar(Qt::Alignment alignment = Qt::AlignRight, QWidget* parent = nullptr);
-    void addWidget(QWidget* widget, Qt::Alignment singleRowAlignment = {});
-
-protected:
-    bool event(QEvent* event) override;
+    void addWidget(QWidget* widget);
 
 private:
-    void updateRequiredHeight();
+    Qt::Alignment m_alignment;
+    int m_widgetCount = 0;
 };

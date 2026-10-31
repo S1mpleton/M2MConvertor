@@ -14,9 +14,7 @@ class HintHandle : public QSplitterHandle {
         setFocusPolicy(Qt::StrongFocus);
         setAutoFillBackground(false);
         UiText::bind(this, "accessibleName", QT_TRANSLATE_NOOP("App", "Размер подсказки"));
-        UiText::bind(this, "toolTip", QT_TRANSLATE_NOOP("App", "Потяните границу, чтобы изменить размер подсказки. "
-                      "Продолжите движение за упор, чтобы скрыть её. "
-                      "Потяните обратно или дважды щёлкните, чтобы раскрыть."));
+        UiText::bind(this, "toolTip", QT_TRANSLATE_NOOP("App", "Потяните за границу, что бы изменить размер области"));
     }
 
   protected:
