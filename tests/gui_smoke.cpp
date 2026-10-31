@@ -50,6 +50,8 @@
 #include <QScreen>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHeaderView>
+#include <QKeySequence>
 #include <QStackedWidget>
 #include <QTabWidget>
 #include <QTest>
@@ -122,6 +124,24 @@ void requireVisibleAction(QWidget* window, QPushButton* button) {
         require(parent->rect().contains(QRect(button->mapTo(parent, QPoint()), button->size())),
             "working button fits every containing widget");
         if (parent == window) break;
+    }
+}
+
+void requireMatrixHeadersFit(AutomatonEditor* editor) {
+    QApplication::processEvents(); QApplication::processEvents();
+    auto* matrix = editor->findChild<QTableWidget*>("transitionMatrix");
+    QFont font = matrix->horizontalHeader()->font(); font.setBold(true);
+    for (int col = 0; col < matrix->columnCount(); ++col)
+        require(matrix->columnWidth(col) >= QFontMetrics(font).horizontalAdvance(matrix->horizontalHeaderItem(col)->text()) + 8,
+            "matrix state headings fit their full names");
+    auto* outputs = editor->findChild<QTableWidget*>("matrixOutputs");
+    if (outputs->isVisible()) {
+        font = outputs->horizontalHeader()->font(); font.setBold(true);
+        for (int col = 0; col < outputs->columnCount(); ++col)
+            require(outputs->columnWidth(col) >= QFontMetrics(font).horizontalAdvance(outputs->horizontalHeaderItem(col)->text()) + 8,
+                "output table captions fit fully, including bold selected headings");
+        require(outputs->viewport()->width() >= outputs->horizontalHeader()->length(),
+            "the output table keeps both full columns visible");
     }
 }
 
@@ -234,6 +254,12 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         "accepted reference table explains that its cells are read-only");
     require(matrix->item(0, 0)->text() == "-", "matrix defaults to no transitions");
     outputs->item(0, 1)->setText("y4");
+    matrix->selectAll(); outputs->selectAll();
+    requireMatrixHeadersFit(source);
+    const auto normalFont = source->font();
+    auto largeFont = normalFont; largeFont.setPointSize(qMax(14, normalFont.pointSize() + 3));
+    source->setFont(largeFont); requireMatrixHeadersFit(source);
+    source->setFont(normalFont); requireMatrixHeadersFit(source);
     build->click();
     require(outputs->item(0, 1)->text() == "y4", "accepting the same dimension preserves entered cells");
     matrix->item(0, 0)->setText("x9"); clear->click();
@@ -428,6 +454,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
             for (int tab = 0; tab < 3; ++tab) {
                 representation->setCurrentIndex(tab); QApplication::processEvents(); QApplication::processEvents();
                 auto* active = representation->currentWidget();
+                if (tab == 1) requireMatrixHeadersFit(editor == 0 ? source : target);
                 require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");
                 const QStringList names = tab == 0 ? (editor == 0 ? QStringList{"acceptTableButton"} :
                     QStringList{"clearTableButton", "configureTableButton", "acceptTableButton"}) : tab == 1 ?
@@ -600,6 +627,19 @@ void testUnsavedChanges() {
     auto* table = window.findChild<AutomatonEditor*>("sourceEditor")->findChild<QTableWidget*>("transitionTable");
     table->editItem(table->item(4, 0)); QApplication::processEvents();
     auto* edit = table->findChild<QLineEdit*>(); require(edit, "pending cell editor opens");
+    edit->setText("x8"); edit->setFocus();
+    const QKeySequence saveKeys(QKeySequence::Save);
+    QTest::keyClick(edit, saveKeys[0].key(), saveKeys[0].keyboardModifiers());
+    QApplication::processEvents();
+    QJsonObject quickSaved;
+    require(ProgressStore::read(path, &quickSaved).ok() && !MainWindowTestAccess::dirty(window) &&
+        quickSaved.value("source").toObject().value("table").toArray()[4].toArray()[0].toString() == "x8",
+        "Save shortcut commits the active editor and writes the existing work file");
+    table->editItem(table->item(4, 0)); QApplication::processEvents();
+    edit = nullptr;
+    for (auto* candidate : table->findChildren<QLineEdit*>())
+        if (candidate->isVisible()) { edit = candidate; break; }
+    require(edit, "cell editor reopens after quick save");
     edit->setText("x9"); edit->setFocus();
     answer(QMessageBox::Cancel); require(!window.close(), "Cancel prevents closing dirty work"); QApplication::processEvents();
     require(questions == 1 && table->item(4, 0)->text() == "x9" && MainWindowTestAccess::dirty(window),

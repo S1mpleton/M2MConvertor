@@ -33,6 +33,7 @@ public:
 
 protected:
     bool eventFilter(QObject* object, QEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
 signals:
     void completedChanged(bool completed);
@@ -54,6 +55,7 @@ private:
     void resetMatrix();
     void buildMatrix(int size);
     void clearMatrix();
+    void resizeMatrixHeaders();
     void updateReference(QTableWidget* table) const;
     bool readMatrix(Automaton* result, Message* error) const;
     bool readGraph(Automaton* result, Message* error) const;
@@ -81,6 +83,7 @@ private:
     bool m_graphAccepted = false;
     bool m_loading = false;
     bool m_tableConfigured = false;
+    bool m_ready = false;
 
     QTabWidget* m_tabs;
     TaskImage* m_assignmentImage;

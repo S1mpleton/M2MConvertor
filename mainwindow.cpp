@@ -34,6 +34,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QKeySequence>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
@@ -156,8 +157,7 @@ QWidget* MainWindow::createLandingPage() {
     title->setFont(titleFont);
     title->setAlignment(Qt::AlignCenter);
     auto* explanation = new WrappingLabel;
-    UiText::bind(explanation, "text", QT_TRANSLATE_NOOP("App", "Откройте зашифрованную базу .m2m с реакциями, созданную в M2MTools, и выберите вариант. "
-        "Направление преобразования определяется самим вариантом."));
+    UiText::bind(explanation, "text", QT_TRANSLATE_NOOP("App", "Откройте зашифрованную базу .m2m с реакциями и выберите вариант."));
     explanation->setWordWrap(true);
     outer->addWidget(title);
     outer->addWidget(explanation);
@@ -173,7 +173,7 @@ QWidget* MainWindow::createLandingPage() {
     archiveLayout->setContentsMargins(20, 24, 20, 20);
     archiveLayout->setSpacing(14);
     auto* archiveHint = new WrappingLabel;
-    UiText::bind(archiveHint, "text", QT_TRANSLATE_NOOP("App", "Выберите файл .m2m с реакциями, экспортированный из M2MTools. "
+    UiText::bind(archiveHint, "text", QT_TRANSLATE_NOOP("App", "Выберите файл .m2m с реакциями. "
         "Приложение проверит целостность архива перед показом вариантов."));
     archiveHint->setWordWrap(true);
     archiveLayout->addWidget(archiveHint);
@@ -193,8 +193,7 @@ QWidget* MainWindow::createLandingPage() {
     variantLayout->setContentsMargins(20, 24, 20, 20);
     variantLayout->setSpacing(14);
     auto* variantHint = new WrappingLabel;
-    UiText::bind(variantHint, "text", QT_TRANSLATE_NOOP("App", "Выберите номер варианта. Направление преобразования уже задано в базе "
-        "и будет выбрано автоматически."));
+    UiText::bind(variantHint, "text", QT_TRANSLATE_NOOP("App", "Выберите номер варианта."));
     variantHint->setWordWrap(true);
     variantLayout->addWidget(variantHint);
     auto* form = new QFormLayout;
@@ -405,6 +404,8 @@ void MainWindow::createMenus() {
     auto* newWork = UiText::action(file, AppIcons::icon(AppIcons::Kind::New), QT_TRANSLATE_NOOP("App", "Выбрать другой вариант"));
     auto* open = UiText::action(file, AppIcons::icon(AppIcons::Kind::Open), QT_TRANSLATE_NOOP("App", "Открыть работу…"));
     m_saveAction = UiText::action(file, AppIcons::icon(AppIcons::Kind::Save), QT_TRANSLATE_NOOP("App", "Сохранить работу"));
+    m_saveAction->setObjectName("saveWorkAction");
+    m_saveAction->setShortcut(QKeySequence::Save);
     m_saveAsAction = UiText::action(file, AppIcons::icon(AppIcons::Kind::Save), QT_TRANSLATE_NOOP("App", "Сохранить работу как…"));
     file->addSeparator();
     auto* quit = UiText::action(file, AppIcons::icon(AppIcons::Kind::Exit), QT_TRANSLATE_NOOP("App", "Выход"));

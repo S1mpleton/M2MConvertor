@@ -30,6 +30,7 @@
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QToolTip>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace {
@@ -65,6 +66,8 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
     }
     for (auto* reference : {m_matrixReference, m_graphReference})
         reference->setItemDelegate(new PlainCellDelegate(reference));
+    m_ready = true;
+    resizeMatrixHeaders();
 }
 
 QString AutomatonEditor::cellHelp(const QTableWidget* table, int row, int column) const {
@@ -257,8 +260,8 @@ QWidget* AutomatonEditor::createMatrixPage() {
     m_matrixOutputs->verticalHeader()->hide();
     m_matrixOutputs->verticalHeader()->setDefaultSectionSize(36);
     m_matrixOutputs->setAlternatingRowColors(true);
-    m_matrixOutputs->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_matrixOutputs->setMinimumWidth(80);
+    m_matrixOutputs->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    m_matrixOutputs->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_matrixOutputs->setItemDelegate(new PlainCellDelegate(m_matrixOutputs));
     m_outputCaption = new QLabel("Y =");
     tables->addWidget(m_outputCaption);
@@ -678,6 +681,7 @@ void AutomatonEditor::buildMatrix(int size) {
         m_matrixOutputs->setItem(state, 1, new QTableWidgetItem("-"));
     }
     ensureItems(m_matrixTable);
+    resizeMatrixHeaders();
     m_matrixContent->show();
     m_clearMatrixButton->setEnabled(true);
     m_acceptMatrixButton->setEnabled(true);
@@ -687,6 +691,34 @@ void AutomatonEditor::buildMatrix(int size) {
 
 void AutomatonEditor::clearMatrix() {
     if (m_matrixTable->rowCount() > 0) buildMatrix(m_matrixTable->rowCount());
+}
+
+void AutomatonEditor::resizeMatrixHeaders() {
+    auto* outputsHeader = m_matrixOutputs->horizontalHeader();
+    QFont headingFont = outputsHeader->font();
+    headingFont.setBold(true); // Selected headers may use a bold font in the OS theme.
+    const QFontMetrics headingMetrics(headingFont);
+    const int padding = 2 * outputsHeader->style()->pixelMetric(QStyle::PM_HeaderMargin) + 14;
+    const int stateWidth = headingMetrics.horizontalAdvance(m_matrixOutputs->horizontalHeaderItem(0)->text()) + padding;
+    const int outputWidth = headingMetrics.horizontalAdvance(m_matrixOutputs->horizontalHeaderItem(1)->text()) + padding;
+    m_matrixOutputs->setColumnWidth(0, stateWidth);
+    // Reserve scrollbar space too, so adding rows cannot squeeze the output caption.
+    m_matrixOutputs->setMinimumWidth(stateWidth + outputWidth + 2 * m_matrixOutputs->frameWidth() +
+        style()->pixelMetric(QStyle::PM_ScrollBarExtent));
+    auto* matrixHeader = m_matrixTable->horizontalHeader();
+    QFont matrixFont = matrixHeader->font(); matrixFont.setBold(true);
+    const QString lastState = QString("a%1").arg(qMax(0, m_matrixTable->columnCount() - 1));
+    const int axisWidth = qMax(48, QFontMetrics(matrixFont).horizontalAdvance(lastState) + padding);
+    matrixHeader->setMinimumSectionSize(axisWidth);
+    m_matrixTable->verticalHeader()->setMinimumWidth(axisWidth);
+    m_matrixTable->setMinimumWidth(2 * axisWidth + 2 * m_matrixTable->frameWidth() +
+        style()->pixelMetric(QStyle::PM_ScrollBarExtent));
+}
+
+void AutomatonEditor::changeEvent(QEvent* event) {
+    QWidget::changeEvent(event);
+    if (m_ready && (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange))
+        QTimer::singleShot(0, this, &AutomatonEditor::resizeMatrixHeaders);
 }
 
 bool AutomatonEditor::readMatrix(Automaton* result, Message* error) const {
@@ -1097,5 +1129,6 @@ void AutomatonEditor::retranslateTexts() {
         table->setColumnWidth(0, fontMetrics().horizontalAdvance(UiText::text(QT_TRANSLATE_NOOP("App", "Входные сигналы"))) + 32);
     }
     m_matrixOutputs->setHorizontalHeaderLabels({UiText::text(QT_TRANSLATE_NOOP("App", "Состояние")), UiText::text(QT_TRANSLATE_NOOP("App", "Выходные сигналы"))});
+    resizeMatrixHeaders();
     m_loading = loading;
 }
