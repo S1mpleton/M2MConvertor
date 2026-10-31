@@ -884,8 +884,9 @@ int main(int argc, char** argv) {
         variantGroup->isAncestorOf(openProgress) && openProgress->text() == "Открыть работу…",
         "landing actions are placed inside their corresponding cards");
     auto* logo = window.findChild<QLabel*>("landingLogo");
-    require(logo && !logo->pixmap().isNull() && logo->geometry().bottom() <
-        window.findChild<QLabel*>("landingTitle")->geometry().top(), "centered placeholder icon precedes the title");
+    require(logo && !logo->pixmap().isNull() && !window.windowIcon().pixmap(32,32).isNull() &&
+        logo->geometry().bottom() < window.findChild<QLabel*>("landingTitle")->geometry().top(),
+        "bundled application icon is available and precedes the landing title");
     require(openArchive->text() == "Открыть архив вариантов…" &&
         window.findChild<QAction*>("eventLogAction")->text() == "Журнал событий",
         "archive and journal captions follow the requested names");

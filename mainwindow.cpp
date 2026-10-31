@@ -66,6 +66,7 @@ QString automatonSummary(const Automaton& automaton) {
 }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
+    setWindowIcon(AppIcons::applicationIcon());
     UiText::bind(this, "windowTitle", QT_TRANSLATE_NOOP("App", "M2MConvertor — эквивалентные автоматы"));
     m_pages = new QStackedWidget;
     m_pages->addWidget(createLandingPage());
@@ -130,7 +131,7 @@ QWidget* MainWindow::createLandingPage() {
     m_landingLogo->setObjectName("landingLogo");
     m_landingLogo->setAlignment(Qt::AlignCenter);
     m_landingLogo->setFixedHeight(88);
-    m_landingLogo->setPixmap(AppIcons::icon(AppIcons::Kind::Swap).pixmap(72, 72));
+    m_landingLogo->setPixmap(AppIcons::applicationIcon().pixmap(72, 72));
     outer->addWidget(m_landingLogo);
     auto* title = new WrappingLabel;
     UiText::bind(title, "text", QT_TRANSLATE_NOOP("App", "Преобразование конечных автоматов Мили и Мура"));
@@ -703,7 +704,7 @@ void MainWindow::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
     if (m_ready && event->type() == QEvent::LanguageChange) refreshTexts();
     if (m_ready && (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange))
-        m_landingLogo->setPixmap(AppIcons::icon(AppIcons::Kind::Swap).pixmap(72, 72));
+        m_landingLogo->setPixmap(AppIcons::applicationIcon().pixmap(72, 72));
 }
 void MainWindow::refreshTexts() {
     if (!m_ready) return;

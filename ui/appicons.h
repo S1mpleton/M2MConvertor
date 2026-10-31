@@ -25,5 +25,6 @@ enum class Kind {
     Clear
 };
 QIcon icon(Kind kind);
+QIcon applicationIcon();
 void configureMenuBar(QMenuBar *bar);
 } // namespace AppIcons

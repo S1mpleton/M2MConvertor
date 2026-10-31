@@ -38,6 +38,11 @@ target_link_libraries(M2MConvertorUi PUBLIC M2MConvertorCore Qt::Widgets)
 
 qt_add_executable(M2MConvertor WIN32 MACOSX_BUNDLE main.cpp)
 target_link_libraries(M2MConvertor PRIVATE M2MConvertorUi)
+if(WIN32)
+    enable_language(RC)
+    target_sources(M2MConvertor PRIVATE resources/windows-icon.rc)
+    target_include_directories(M2MConvertor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/resources)
+endif()
 set(TRANSLATION_TARGETS M2MConvertor)
 
 include(CTest)
@@ -54,6 +59,12 @@ if(BUILD_TESTING)
     set_tests_properties(M2MConvertorGuiStartup PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
+
+foreach(icon_target IN LISTS TRANSLATION_TARGETS)
+    qt_add_resources(${icon_target} window_icons
+        PREFIX "/icons" BASE "resources/icons"
+        FILES resources/icons/m2mconvertor.png)
+endforeach()
 
 get_target_property(CORE_TRANSLATION_SOURCES M2MConvertorCore SOURCES)
 get_target_property(UI_TRANSLATION_SOURCES M2MConvertorUi SOURCES)
