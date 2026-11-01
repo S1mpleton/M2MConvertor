@@ -213,9 +213,9 @@ QIcon AppIcons::icon(Kind kind) {
     return QIcon(new Engine(kind));
 }
 QIcon AppIcons::applicationIcon() {
-    QIcon result(QStringLiteral(":/icons/m2mconvertor.png"));
+    QIcon result(QStringLiteral(":/icons/variant-01/m2mconvertor.png"));
     for (const int size : {16, 20, 24, 32})
-        result.addFile(QStringLiteral(":/icons/m2mconvertor-%1.png").arg(size), QSize(size, size));
+        result.addFile(QStringLiteral(":/icons/variant-01/m2mconvertor-%1.png").arg(size), QSize(size, size));
     return result;
 }
 

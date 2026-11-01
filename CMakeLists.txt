@@ -65,7 +65,10 @@ foreach(icon_target IN LISTS TRANSLATION_TARGETS)
         PREFIX "/icons" BASE "resources/icons"
         FILES resources/icons/m2mconvertor.png
             resources/icons/m2mconvertor-16.png resources/icons/m2mconvertor-20.png
-            resources/icons/m2mconvertor-24.png resources/icons/m2mconvertor-32.png)
+            resources/icons/m2mconvertor-24.png resources/icons/m2mconvertor-32.png
+            resources/icons/variant-01/m2mconvertor.png
+            resources/icons/variant-01/m2mconvertor-16.png resources/icons/variant-01/m2mconvertor-20.png
+            resources/icons/variant-01/m2mconvertor-24.png resources/icons/variant-01/m2mconvertor-32.png)
 endforeach()
 
 get_target_property(CORE_TRANSLATION_SOURCES M2MConvertorCore SOURCES)
