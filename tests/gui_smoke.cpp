@@ -1,6 +1,7 @@
 #include "infrastructure/translationmanager.h"
 #include "infrastructure/logger.h"
 #include "infrastructure/progressstore.h"
+#include "domain/conversionservice.h"
 #include "ui/logwindow.h"
 #include <QAction>
 #include <QMenu>
@@ -145,6 +146,96 @@ void requireMatrixHeadersFit(AutomatonEditor* editor) {
         require(outputs->viewport()->width() >= outputs->horizontalHeader()->length(),
             "the output table keeps both full columns visible");
     }
+}
+
+void testTerminalMooreWorkflow() {
+    const auto task = terminalMooreVariant();
+    const auto moore = terminalMooreAutomaton();
+    Automaton mealy;
+    require(ConversionService::convert(moore, &mealy), "build equivalent Mealy fixture");
+    QJsonObject source, target;
+    for (const auto& automaton : {moore, mealy}) {
+        const bool isMoore = automaton.kind == AutomatonKind::Moore;
+        AutomatonEditor editor;
+        editor.setTask(task, automaton.kind);
+        const QString prefix = isMoore ? "moore" : "mealy";
+        editor.findChild<QSpinBox*>(prefix + "StateCount")->setValue(3);
+        editor.findChild<QSpinBox*>(prefix + "InputCount")->setValue(3);
+        editor.findChild<QSpinBox*>(prefix + "OutputCount")->setValue(4);
+        editor.findChild<QPushButton*>("configureTableButton")->click();
+        auto* table = editor.findChild<QTableWidget*>("transitionTable");
+        auto outputText = [&](const QSet<int>& outputs) {
+            QStringList names;
+            for (int index : outputs) names.append(automaton.outputs[index]);
+            names.sort();
+            return names.isEmpty() ? QString("-") : names.join(", ");
+        };
+        const int inputRow = isMoore ? 4 : 2;
+        for (int input = 0; input < 3; ++input) {
+            table->item(inputRow + input, 0)->setText(automaton.inputs[input]);
+            for (int state = 0; state < 3; ++state) {
+                const auto* edge = automaton.transition(state, input);
+                if (edge)
+                    table->item(inputRow + input, state + 1)->setText(automaton.states[edge->to] +
+                        (isMoore ? QString() : " / " + outputText(edge->outputs)));
+            }
+        }
+        if (isMoore)
+            for (int state = 0; state < 3; ++state)
+                table->item(1, state + 1)->setText(outputText(automaton.mooreOutputs[state]));
+        editor.findChild<QPushButton*>("acceptTableButton")->click();
+        require(editor.toJson().value("tableAccepted").toBool(), "table accepts the terminal Moore observation for each automaton kind");
+
+        editor.findChild<QSpinBox*>("matrixDimensionEdit")->setValue(3);
+        editor.findChild<QPushButton*>("configureMatrixButton")->click();
+        auto* matrix = editor.findChild<QTableWidget*>("transitionMatrix");
+        for (int from = 0; from < 3; ++from)
+            for (int to = 0; to < 3; ++to) {
+                QStringList labels;
+                for (const auto& edge : automaton.transitions)
+                    if (edge.from == from && edge.to == to)
+                        labels.append(automaton.inputs[edge.input] +
+                            (isMoore ? QString() : " / " + outputText(edge.outputs)));
+                if (!labels.isEmpty()) matrix->item(from, to)->setText(labels.join(isMoore ? ", " : "; "));
+            }
+        if (isMoore) {
+            auto* outputs = editor.findChild<QTableWidget*>("matrixOutputs");
+            for (int state = 0; state < 3; ++state)
+                outputs->item(state, 1)->setText(outputText(automaton.mooreOutputs[state]));
+        }
+        editor.findChild<QPushButton*>("acceptMatrixButton")->click();
+        require(editor.toJson().value("matrixAccepted").toBool(), "matrix accepts the same terminal Moore observation");
+
+        QJsonArray vertices, edges;
+        for (int state = 0; state < 3; ++state)
+            vertices.append(QJsonObject{{"id", state}, {"label", automaton.states[state] +
+                (isMoore ? " / " + outputText(automaton.mooreOutputs[state]) : QString())},
+                {"x", 160 + 220 * state}, {"y", 160}});
+        for (const auto& edge : automaton.transitions)
+            edges.append(QJsonObject{{"from", edge.from}, {"to", edge.to},
+                {"label", automaton.inputs[edge.input] + (isMoore ? QString() : " / " + outputText(edge.outputs))}});
+        auto* graph = editor.findChild<AutomatonGraphEditor*>();
+        require(graph->fromJson(QJsonObject{{"vertices", vertices}, {"edges", edges}}), "restore the example's graph");
+        editor.findChild<QPushButton*>("acceptGraphButton")->click();
+        require(editor.completed(), "graph accepts the same terminal Moore observation");
+        (isMoore ? source : target) = editor.toJson();
+    }
+    QTemporaryDir directory;
+    const auto archivePath = directory.filePath("terminal.m2m");
+    QFile file(archivePath); require(file.open(QIODevice::WriteOnly), "open terminal workflow archive");
+    auto root = trainingArchiveJson(); root.insert("variants", QJsonArray{trainingVariantJson(task)});
+    file.write(makeCompatibleArchive(root)); file.close();
+    const QJsonObject progress{{"archivePath", archivePath}, {"variantNumber", task.number},
+        {"introCompleted", true}, {"source", source}, {"target", target}};
+    const auto progressPath = directory.filePath("terminal.m2mwork");
+    QJsonObject loaded;
+    require(ProgressStore::write(progressPath, progress).ok() && ProgressStore::read(progressPath, &loaded).ok(),
+        "save and reopen the terminal Moore workflow");
+    MainWindow restored;
+    require(MainWindowTestAccess::restore(restored, loaded) &&
+        restored.findChild<AutomatonEditor*>("sourceEditor")->completed() &&
+        restored.findChild<AutomatonEditor*>("targetEditor")->completed(),
+        "reopening the work retains acceptance of all six representations");
 }
 
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
@@ -1041,6 +1132,7 @@ int main(int argc, char** argv) {
                 "interactive graph screenshot is saved");
     }
     testReactionWorkflow(window, argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
+    testTerminalMooreWorkflow();
     testBoundedGraph(argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
     testUnsavedChanges();
     testJournal();

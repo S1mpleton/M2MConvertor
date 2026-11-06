@@ -126,11 +126,15 @@ bool parseVariant(const QJsonObject& object, TrainingVariant* variant, Message* 
     const QRegularExpression inputPattern(QStringLiteral("^x[0-9]$"));
     const QRegularExpression outputPattern(QStringLiteral("^y[0-9]$"));
     QSet<QString> inputs, outputs;
-    for (const auto& value : object.value("reaction").toArray()) {
-        const auto step = value.toObject();
+    const auto steps = object.value("reaction").toArray();
+    for (int i = 0; i < steps.size(); ++i) {
+        const auto step = steps[i].toObject();
         ReactionStep reaction;
         reaction.input = step.value("input").toString();
-        if (!inputPattern.match(reaction.input).hasMatch() ||
+        const bool terminalMooreOutput = parsed.direction == ConversionDirection::MooreToMealy &&
+            i + 1 == steps.size() && reaction.input.isEmpty();
+        if (!step.value("input").isString() ||
+            (!terminalMooreOutput && !inputPattern.match(reaction.input).hasMatch()) ||
             !stringList(step.value("outputs"), &reaction.outputs))
             return fail(Message(QT_TRANSLATE_NOOP("Result", "Повреждён такт реакции автомата.")));
         QSet<QString> seen;
@@ -141,7 +145,8 @@ bool parseVariant(const QJsonObject& object, TrainingVariant* variant, Message* 
             seen.insert(output);
             outputs.insert(output);
         }
-        inputs.insert(reaction.input);
+        if (!reaction.input.isEmpty())
+            inputs.insert(reaction.input);
         parsed.reaction.append(reaction);
     }
     const auto& source =

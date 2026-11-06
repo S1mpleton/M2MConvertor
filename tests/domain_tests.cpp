@@ -43,8 +43,47 @@ Automaton sampleMoore() {
 
 #include "tests/archivefixture.h"
 
+void testTerminalMooreReaction() {
+    auto task = terminalMooreVariant();
+    auto moore = terminalMooreAutomaton();
+    require(ReactionChecker::check(task, moore).accepted,
+        "the photographed Moore reaction observes the final state's outputs without an input");
+    Automaton mealy;
+    require(ConversionService::convert(moore, &mealy) && ReactionChecker::check(task, mealy).accepted,
+        "the equivalent Mealy automaton emits each next Moore state's outputs on its six transitions");
+    auto invalid = task;
+    invalid.reaction.last().outputs = {"y3"};
+    require(ReactionChecker::check(invalid, moore).step == 6 &&
+        !ReactionChecker::check(invalid, moore).accepted &&
+        ReactionChecker::check(invalid, mealy).step == 5 && !ReactionChecker::check(invalid, mealy).accepted,
+        "wrong terminal outputs are checked in Moore's last state and Mealy's last transition");
+    invalid = task;
+    invalid.reaction.first().outputs = {"y2"};
+    require(!ReactionChecker::check(invalid, moore).accepted && ReactionChecker::check(invalid, mealy).accepted,
+        "the initial Moore state's output is not a Mealy transition output");
+    invalid = task;
+    invalid.reaction[1].input.clear();
+    require(!ReactionChecker::check(invalid, moore).accepted && !ReactionChecker::check(invalid, mealy).accepted,
+        "missing inputs inside a reaction cannot be treated as state observations");
+    auto broken = moore;
+    broken.transitions.removeAt(1); // a0 --x2--> a2 is the last observed transition.
+    require(!ReactionChecker::check(task, broken).accepted && ReactionChecker::check(task, broken).step == 5,
+        "the input before the terminal observation must reach the final state");
+    broken = mealy;
+    broken.transitions.first().outputs = {0};
+    require(!ReactionChecker::check(task, broken).accepted && ReactionChecker::check(task, broken).step == 0,
+        "Mealy cannot emit the departing state's Moore outputs instead of the destination's outputs");
+    task.moore = task.mealy = {2, 1, 1};
+    task.reaction = {{"x9", {"y4"}}, {"", {}}};
+    moore.states = {"a0", "a1"}; moore.inputs = {"x9"}; moore.outputs = {"y4"};
+    moore.mooreOutputs = {{0}, {}}; moore.transitions = {{0, 0, 1, {}}};
+    require(ReactionChecker::check(task, moore).accepted,
+        "an output-only final Moore state may also have no outputs");
+}
+
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
+    testTerminalMooreReaction();
     auto task = trainingVariant();
     task.reaction = {{"x2", {"y2"}}, {"x1", {"y3", "y0"}},
                      {"x2", {"y2"}}, {"x2", {"y3", "y0"}}};
@@ -257,6 +296,30 @@ int main(int argc, char** argv) {
     require(!loadRoot(root), "old full-automaton payload is rejected");
     require(variants.size() == 1 && variants.first().reaction.size() == 5,
             "failed imports do not overwrite the loaded task list");
+    root = trainingArchiveJson();
+    const auto terminal = trainingVariantJson(terminalMooreVariant());
+    root.insert("variants", QJsonArray{terminal});
+    require(loadRoot(root) && variants.first().reaction.last().input.isEmpty() &&
+        variants.first().reaction.last().outputs == QStringList{"y3", "y4"},
+        "archive import retains final Moore outputs without counting an empty input as a signal");
+    for (int position : {1, 5}) {
+        malformed = terminal;
+        steps = malformed.value("reaction").toArray();
+        auto step = steps[position].toObject(); step.insert("input", ""); steps[position] = step;
+        malformed.insert("reaction", steps); root.insert("variants", QJsonArray{malformed});
+        require(!loadRoot(root), "an archived empty input before the final step is rejected");
+    }
+    malformed = terminal; malformed.insert("type", "MealyToMoore");
+    root.insert("variants", QJsonArray{malformed});
+    require(!loadRoot(root), "Mealy source archives cannot end with an input-free step");
+    malformed = terminal; steps = malformed.value("reaction").toArray();
+    auto finalStep = steps.last().toObject(); finalStep.remove("input"); steps[steps.size() - 1] = finalStep;
+    malformed.insert("reaction", steps); root.insert("variants", QJsonArray{malformed});
+    require(!loadRoot(root), "a missing input field is corruption rather than an explicit empty input");
+    auto terminalOnlySignal = terminalMooreVariant();
+    terminalOnlySignal.reaction.last().outputs.append("y5"); terminalOnlySignal.moore.outputs = 5;
+    root.insert("variants", QJsonArray{trainingVariantJson(terminalOnlySignal)});
+    require(loadRoot(root), "source output counts include signals present only in the final observation");
     if (argc > 1) {
         require(VariantArchive::load(QString::fromLocal8Bit(argv[1]), &variants, &error) &&
                 variants.size() == 1 && variants.first().number == 7 &&

@@ -24,16 +24,36 @@ inline TrainingVariant trainingVariant() {
     return task;
 }
 
-inline QJsonObject trainingVariantJson() {
-    const auto task = trainingVariant();
+inline TrainingVariant terminalMooreVariant() {
+    auto task = trainingVariant();
+    task.moore = task.mealy = {3, 3, 4};
+    task.reaction = {{"x1", {"y1"}}, {"x1", {"y2"}}, {"x2", {"y3", "y4"}},
+        {"x2", {"y2"}}, {"x3", {"y1"}}, {"x2", {"y1"}}, {"", {"y3", "y4"}}};
+    return task;
+}
+
+inline Automaton terminalMooreAutomaton() {
+    Automaton automaton;
+    automaton.kind = AutomatonKind::Moore;
+    automaton.states = {"a0", "a1", "a2"};
+    automaton.initialState = 0;
+    automaton.inputs = {"x1", "x2", "x3"};
+    automaton.outputs = {"y1", "y2", "y3", "y4"};
+    automaton.mooreOutputs = {{0}, {1}, {2, 3}};
+    automaton.transitions = {{0, 0, 1, {}}, {0, 1, 2, {}}, {0, 2, 0, {}},
+        {1, 0, 2, {}}, {1, 1, 0, {}}, {2, 1, 1, {}}};
+    return automaton;
+}
+
+inline QJsonObject trainingVariantJson(const TrainingVariant& task = trainingVariant()) {
     QJsonArray steps;
     for (const auto& step : task.reaction)
         steps.append(QJsonObject{{"input", step.input},
                                  {"outputs", QJsonArray::fromStringList(step.outputs)}});
     return {{"number", task.number},
-            {"type", "MooreToMealy"},
-            {"moore", QJsonObject{{"states", 3}, {"inputs", 2}, {"outputs", 3}}},
-            {"mealy", QJsonObject{{"states", 2}, {"inputs", 2}, {"outputs", 3}}},
+            {"type", task.direction == ConversionDirection::MooreToMealy ? "MooreToMealy" : "MealyToMoore"},
+            {"moore", QJsonObject{{"states", task.moore.states}, {"inputs", task.moore.inputs}, {"outputs", task.moore.outputs}}},
+            {"mealy", QJsonObject{{"states", task.mealy.states}, {"inputs", task.mealy.inputs}, {"outputs", task.mealy.outputs}}},
             {"reaction", steps},
             {"image", QJsonObject{{"fileName", task.diagramFileName},
                                   {"data", QString::fromLatin1(task.diagram.toBase64())}}}};

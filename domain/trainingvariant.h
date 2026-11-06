@@ -13,6 +13,7 @@ struct AutomatonCounts {
 };
 
 struct ReactionStep {
+    // An empty input is allowed only for the final output of a Moore reaction.
     QString input;
     QStringList outputs;
 };

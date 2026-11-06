@@ -166,7 +166,7 @@
 
 Принимайте представления по порядку: таблица, матрица A и граф Мура, затем таблица, матрица B и граф эквивалентного автомата Мили. Следующий этап откроется после правильного выполнения предыдущего.
 
-Каждое представление проверяется по реакции варианта из a0. Для Мура сравнивается выход до перехода, для Мили — выход на переходе. Совпадение конечной реакции не доказывает эквивалентность на всех входных последовательностях.
+Каждое представление проверяется по реакции варианта из a0. Для Мура сравнивается выход до перехода, для Мили — выход на переходе. Если последний такт Мура не имеет входа, в нём проверяется только выход состояния; у Мили выход каждого перехода сравнивается с выходом следующего состояния Мура. Совпадение конечной реакции не доказывает эквивалентность на всех входных последовательностях.
 
 Подсказку можно уменьшить или скрыть разделителем. Примеры ввода доступны при наведении на ячейки. Ctrl+S сохраняет работу; в конце заполните сведения об участниках и создайте отчёт.</source>
         <translation>Study the task image. Click Continue to open the Moore automaton table.
@@ -175,7 +175,7 @@ In the Moore table, enter the numbers of states, inputs and outputs, then accept
 
 Accept each representation in order: the Moore table, matrix A and graph, followed by the table, matrix B and graph of the equivalent Mealy automaton. Each stage opens after the previous one is completed correctly.
 
-Each representation is checked against the variant’s reaction starting from a0. Moore outputs are compared before transitions; Mealy outputs are compared on transitions. Matching a finite reaction does not prove equivalence for every input sequence.
+Each representation is checked against the variant’s reaction starting from a0. Moore outputs are compared before transitions; Mealy outputs are compared on transitions. If the final Moore step has no input, only its state output is checked; each Mealy transition is compared with the next Moore state’s output. Matching a finite reaction does not prove equivalence for every input sequence.
 
 Use the divider to resize or hide the hint. Hover over cells for input examples. Ctrl+S saves your work; at the end, fill in the participant details and create a report.</translation>
     </message>
@@ -923,6 +923,10 @@ Conversion: %2</translation>
         <location filename="domain/reactionchecker.cpp" line="40"/>
         <source>В варианте отсутствует реакция для проверки.</source>
         <translation>The variant has no reaction to check.</translation>
+    </message>
+    <message>
+        <source>Такт %1: пустой вход допустим только в последнем такте реакции Мура.</source>
+        <translation>Step %1: an empty input is allowed only in the final Moore reaction step.</translation>
     </message>
     <message>
         <location filename="domain/reactionchecker.cpp" line="55"/>

@@ -38,6 +38,18 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
             return {false, Message(QT_TRANSLATE_NOOP("Result", "Выходной сигнал должен иметь вид y0…y9."))};
     if (task.reaction.isEmpty())
         return {false, Message(QT_TRANSLATE_NOOP("Result", "В варианте отсутствует реакция для проверки."))};
+    const bool terminalMooreOutput = task.direction == ConversionDirection::MooreToMealy &&
+        task.reaction.last().input.isEmpty();
+    for (int i = 0; i < task.reaction.size(); ++i)
+        if (task.reaction[i].input.isEmpty() && !(terminalMooreOutput && i + 1 == task.reaction.size()))
+            return {false, Message(QT_TRANSLATE_NOOP("Result", "Такт %1: пустой вход допустим только в последнем такте реакции Мура."))
+                               .arg(i + 1), i};
+
+    // A complete Moore trace has N inputs and N+1 state outputs. Its equivalent
+    // Mealy trace has N transitions, each emitting the next Moore state's output.
+    // Archives without an explicit terminal observation retain their trace convention.
+    const bool shiftedMealy = terminalMooreOutput && candidate.kind == AutomatonKind::Mealy;
+    const int stepCount = task.reaction.size() - (shiftedMealy ? 1 : 0);
 
     // Build an index once: checking a long ordered trace is O(transitions + steps).
     QHash<quint64, const Transition*> edges;
@@ -47,18 +59,20 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
     for (const auto& edge : candidate.transitions)
         edges.insert(key(edge.from, edge.input), &edge);
     int state = 0;
-    for (int i = 0; i < task.reaction.size(); ++i) {
-        const auto& expected = task.reaction[i];
-        const int input = candidate.inputs.indexOf(expected.input);
-        if (input < 0)
+    for (int i = 0; i < stepCount; ++i) {
+        const auto& signal = task.reaction[i].input;
+        const auto& expected = task.reaction[i + (shiftedMealy ? 1 : 0)];
+        const bool outputOnly = terminalMooreOutput && !shiftedMealy && i + 1 == stepCount;
+        const int input = outputOnly ? -1 : candidate.inputs.indexOf(signal);
+        if (input < 0 && !outputOnly)
             return {false,
-                    Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(i + 1).arg(expected.input), i};
-        const auto* edge = edges.value(key(state, input), nullptr);
+                    Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(i + 1).arg(signal), i};
+        const auto* edge = outputOnly ? nullptr : edges.value(key(state, input), nullptr);
         if (!edge && candidate.kind == AutomatonKind::Mealy)
             return {false,
                     Message(QT_TRANSLATE_NOOP("Result", "Такт %1: из %2 не задан переход по %3."))
                         .arg(i + 1)
-                        .arg(candidate.states[state], expected.input),
+                        .arg(candidate.states[state], signal),
                     i};
         // Moore emits at the current state. The final transition is unobserved.
         const auto& values =
@@ -73,22 +87,22 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
             return {false,
                     Message(QT_TRANSLATE_NOOP("Result", "Такт %1, %2 из %3: ожидались выходы %4, получены %5."))
                         .arg(i + 1)
-                        .arg(expected.input, candidate.states[state],
+                        .arg(signal.isEmpty() ? QStringLiteral("—") : signal, candidate.states[state],
                              expected.outputs.isEmpty() ? QStringLiteral("—")
                                                         : expected.outputs.join(", "),
                              observed.isEmpty() ? QStringLiteral("—") : observed.join(", ")),
                     i};
         }
-        if (i + 1 < task.reaction.size()) {
+        if (i + 1 < stepCount) {
             if (!edge)
                 return {false,
                         Message(QT_TRANSLATE_NOOP("Result", "Такт %1: из %2 нет перехода по %3 для продолжения реакции."))
                             .arg(i + 1)
-                            .arg(candidate.states[state], expected.input),
+                            .arg(candidate.states[state], signal),
                         i};
             state = edge->to;
         }
     }
     return {true, Message(QT_TRANSLATE_NOOP("Result", "Верно. Реакция из a0 совпадает с вариантом во всех %1 тактах."))
-                      .arg(task.reaction.size())};
+                      .arg(stepCount)};
 }
