@@ -14,6 +14,7 @@ class HintSplitter : public QSplitter {
     void setHintExtent(int extent);
     void toggleHint();
     void setWorkTitle(const char* title);
+    void setHintTitle(const char* title);
 
   protected:
     QSplitterHandle* createHandle() override;

@@ -9,7 +9,8 @@
 
 class AutomatonEditor;
 class QAction;
-class QComboBox;
+class QButtonGroup;
+class QSpinBox;
 class QLabel;
 class FeedbackLabel;
 class TaskImage;
@@ -53,6 +54,8 @@ private:
     void chooseArchive();
     bool loadArchive(const QString& path, bool showErrors = true);
     void updateVariantSelection(int index);
+    std::optional<ConversionDirection> selectedDirection() const;
+    void selectDirection(ConversionDirection direction);
     void beginWork();
     bool setupWorkspace(const TrainingVariant& variant);
     void continueWork();
@@ -71,17 +74,18 @@ private:
 
     QStackedWidget* m_pages;
     QLabel* m_archivePathLabel;
-    QComboBox* m_variantCombo;
+    QButtonGroup* m_directionButtons;
+    QSpinBox* m_variantNumber;
+    QLabel* m_variantCountLabel;
+    QLabel* m_workInstructions;
+    QPushButton* m_acceptVariantButton;
     QLabel* m_landingDirection;
     QPushButton* m_beginButton;
 
     QTabWidget* m_workflowTabs;
     QLabel* m_variantTitle;
-    QLabel* m_startVariantLabel;
-    QLabel* m_landingLogo;
     TaskImage* m_diagramLabel;
     QWidget* m_landingPage;
-    WorkScrollArea* m_startWorkScroll;
     HintSplitter* m_startSplitter;
     AutomatonEditor* m_sourceEditor;
     AutomatonEditor* m_targetEditor;

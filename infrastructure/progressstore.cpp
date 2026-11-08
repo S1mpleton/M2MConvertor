@@ -1,10 +1,35 @@
 #include "infrastructure/progressstore.h"
 #include "domain/result.h"
 #include <QFileInfo>
+#include <QDir>
 
 #include <QFile>
 #include <QJsonDocument>
 #include <QSaveFile>
+
+QString ProgressStore::suffix(ConversionDirection direction) {
+    return direction == ConversionDirection::MooreToMealy ? QStringLiteral("mumi") : QStringLiteral("mimu");
+}
+
+std::optional<ConversionDirection> ProgressStore::directionFromPath(const QString& path) {
+    const auto extension = QFileInfo(path).suffix().toLower();
+    if (extension == "mumi") return ConversionDirection::MooreToMealy;
+    if (extension == "mimu") return ConversionDirection::MealyToMoore;
+    return std::nullopt;
+}
+
+QString ProgressStore::pathForDirection(const QString& path, ConversionDirection direction) {
+    const QString extension = suffix(direction);
+    if (QFileInfo(path).suffix().compare(extension, Qt::CaseInsensitive) == 0) return path;
+    const QString previous = QFileInfo(path).suffix().toLower();
+    if (previous == "mumi" || previous == "mimu" || previous == "m2mwork")
+        return path.left(path.size() - previous.size()) + extension;
+    return path + "." + extension;
+}
+
+QString ProgressStore::workDirectory() {
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("Work"));
+}
 
 Result ProgressStore::write(const QString& path, const QJsonObject& data) {
     Message message;

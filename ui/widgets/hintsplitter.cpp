@@ -116,3 +116,8 @@ void HintSplitter::toggleHint() {
 void HintSplitter::setWorkTitle(const char* title) {
     UiText::bind(widget(1), "title", title);
 }
+
+void HintSplitter::setHintTitle(const char* title) {
+    if (auto* group = qobject_cast<QGroupBox*>(widget(0)))
+        UiText::bind(group, "title", title);
+}

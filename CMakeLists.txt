@@ -3,7 +3,7 @@ project(M2MConvertor VERSION 0.2 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets LinguistTools)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Sql LinguistTools)
 find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS Crypto)
 qt_standard_project_setup()
 
@@ -18,7 +18,7 @@ add_library(M2MConvertorCore STATIC
     infrastructure/variantarchive.cpp infrastructure/variantarchive.h
     infrastructure/progressstore.cpp infrastructure/progressstore.h)
 target_include_directories(M2MConvertorCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(M2MConvertorCore PUBLIC Qt::Core Qt::Gui OpenSSL::Crypto)
+target_link_libraries(M2MConvertorCore PUBLIC Qt::Core Qt::Gui Qt::Sql OpenSSL::Crypto)
 
 add_library(M2MConvertorUi STATIC
     ui/widgets/actionbar.cpp ui/widgets/actionbar.h

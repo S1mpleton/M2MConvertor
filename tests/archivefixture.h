@@ -4,6 +4,9 @@
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QUuid>
 #include <memory>
 #include <openssl/evp.h>
 
@@ -52,8 +55,8 @@ inline QJsonObject trainingVariantJson(const TrainingVariant& task = trainingVar
                                  {"outputs", QJsonArray::fromStringList(step.outputs)}});
     return {{"number", task.number},
             {"type", task.direction == ConversionDirection::MooreToMealy ? "MooreToMealy" : "MealyToMoore"},
-            {"moore", QJsonObject{{"states", task.moore.states}, {"inputs", task.moore.inputs}, {"outputs", task.moore.outputs}}},
-            {"mealy", QJsonObject{{"states", task.mealy.states}, {"inputs", task.mealy.inputs}, {"outputs", task.mealy.outputs}}},
+            {"moore", QJsonObject{{"states", task.moore.states}, {"inputs", task.moore.inputs}, {"outputs", task.moore.outputs}, {"transitions", task.moore.transitions}}},
+            {"mealy", QJsonObject{{"states", task.mealy.states}, {"inputs", task.mealy.inputs}, {"outputs", task.mealy.outputs}, {"transitions", task.mealy.transitions}}},
             {"reaction", steps},
             {"image", QJsonObject{{"fileName", task.diagramFileName},
                                   {"data", QString::fromLatin1(task.diagram.toBase64())}}}};
@@ -63,6 +66,46 @@ inline QJsonObject trainingArchiveJson() {
     return {{"format", "M2MToolsLite"},
             {"version", 1},
             {"variants", QJsonArray{trainingVariantJson()}}};
+}
+
+inline void makeVariantDatabase(const QString& path, const QList<TrainingVariant>& variants) {
+    const QString connection = QUuid::createUuid().toString();
+    {
+        auto database = QSqlDatabase::addDatabase("QSQLITE", connection);
+        database.setDatabaseName(path);
+        require(database.open(), "open SQLite database fixture");
+        QSqlQuery query(database);
+        require(query.exec("CREATE TABLE LiteMetadata(version INTEGER)") && query.exec("INSERT INTO LiteMetadata VALUES(3)") &&
+            query.exec("CREATE TABLE Variants(id INTEGER PRIMARY KEY,number INTEGER,conversion TEXT,mealy_states INTEGER,"
+                "mealy_inputs INTEGER,mealy_outputs INTEGER,mealy_transitions INTEGER,moore_states INTEGER,moore_inputs INTEGER,"
+                "moore_outputs INTEGER,moore_transitions INTEGER)") &&
+            query.exec("CREATE TABLE ReactionSteps(variant_id INTEGER,position INTEGER,input TEXT,outputs_json TEXT)") &&
+            query.exec("CREATE TABLE VariantImages(variant_id INTEGER,data BLOB,file_name TEXT)"), "create current database schema fixture");
+        for (const auto& variant : variants) {
+            query.prepare("INSERT INTO Variants VALUES(:n,:n,:type,:ms,:mi,:mo,:mt,:rs,:ri,:ro,:rt)");
+            query.bindValue(":n", variant.number);
+            query.bindValue(":type", variant.direction == ConversionDirection::MooreToMealy ? "MooreToMealy" : "MealyToMoore");
+            query.bindValue(":ms", variant.mealy.states); query.bindValue(":mi", variant.mealy.inputs);
+            query.bindValue(":mo", variant.mealy.outputs); query.bindValue(":mt", variant.mealy.transitions);
+            query.bindValue(":rs", variant.moore.states); query.bindValue(":ri", variant.moore.inputs);
+            query.bindValue(":ro", variant.moore.outputs); query.bindValue(":rt", variant.moore.transitions);
+            require(query.exec(), "store fixture variant counts");
+            for (int i = 0; i < variant.reaction.size(); ++i) {
+                query.prepare("INSERT INTO ReactionSteps VALUES(:n,:i,:x,:y)");
+                query.bindValue(":n", variant.number); query.bindValue(":i", i);
+                query.bindValue(":x", variant.reaction[i].input);
+                query.bindValue(":y", QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(variant.reaction[i].outputs)).toJson()));
+                require(query.exec(), "store fixture reaction step");
+            }
+            if (!variant.diagram.isEmpty()) {
+                query.prepare("INSERT INTO VariantImages VALUES(:n,:data,:file)");
+                query.bindValue(":n", variant.number); query.bindValue(":data", variant.diagram);
+                query.bindValue(":file", variant.diagramFileName);
+                require(query.exec(), "store fixture image");
+            }
+        }
+    }
+    QSqlDatabase::removeDatabase(connection);
 }
 
 inline QByteArray archiveKeyMaterial() {

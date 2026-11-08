@@ -192,7 +192,7 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* actions = new ActionBar;
     actions->addWidget(accept);
     workLayout->addWidget(actions);
-    m_assignmentPanel = new HintSplitter(QT_TRANSLATE_NOOP("App", "Задание варианта"), m_assignmentImage, work, "tableAssignment");
+    m_assignmentPanel = new HintSplitter(UiText::presentationTitle(true), m_assignmentImage, work, "tableAssignment");
     outer->addWidget(m_assignmentPanel, 1);
     return page;
 }
@@ -354,6 +354,7 @@ QWidget* AutomatonEditor::createGraphPage() {
 
 void AutomatonEditor::setTask(const TrainingVariant& task, AutomatonKind kind) {
     m_task = task;
+    m_assignmentPanel->setHintTitle(UiText::presentationTitle(task.sourceKind() == AutomatonKind::Moore));
     m_editorKind = kind;
     m_countStates->setObjectName(kind == AutomatonKind::Moore ? "mooreStateCount" : "mealyStateCount");
     m_countInputs->setObjectName(kind == AutomatonKind::Moore ? "mooreInputCount" : "mealyInputCount");

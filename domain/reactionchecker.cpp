@@ -12,7 +12,7 @@ QStringList ReactionChecker::stateNames(int count) {
 ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Automaton& candidate,
                                            bool graph) {
     if (!task.available())
-        return {false, Message(QT_TRANSLATE_NOOP("Result", "Преобразование Мили → Мура находится в разработке."))};
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "Неизвестный тип преобразования."))};
     const auto valid = candidate.validation();
     if (!valid.ok()) return {false, valid.message()};
     const auto& counts = task.counts(candidate.kind);
@@ -49,6 +49,8 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
     // Mealy trace has N transitions, each emitting the next Moore state's output.
     // Archives without an explicit terminal observation retain their trace convention.
     const bool shiftedMealy = terminalMooreOutput && candidate.kind == AutomatonKind::Mealy;
+    const bool destinationMooreOutput = task.direction == ConversionDirection::MealyToMoore &&
+        candidate.kind == AutomatonKind::Moore;
     const int stepCount = task.reaction.size() - (shiftedMealy ? 1 : 0);
 
     // Build an index once: checking a long ordered trace is O(transitions + steps).
@@ -68,15 +70,16 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
             return {false,
                     Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(i + 1).arg(signal), i};
         const auto* edge = outputOnly ? nullptr : edges.value(key(state, input), nullptr);
-        if (!edge && candidate.kind == AutomatonKind::Mealy)
+        if (!edge && (candidate.kind == AutomatonKind::Mealy || destinationMooreOutput))
             return {false,
                     Message(QT_TRANSLATE_NOOP("Result", "Такт %1: из %2 не задан переход по %3."))
                         .arg(i + 1)
                         .arg(candidate.states[state], signal),
                     i};
-        // Moore emits at the current state. The final transition is unobserved.
+        // For a Mealy source, compare the Moore state reached by this input.
         const auto& values =
-            candidate.kind == AutomatonKind::Moore ? candidate.mooreOutputs[state] : edge->outputs;
+            candidate.kind == AutomatonKind::Moore
+                ? candidate.mooreOutputs[destinationMooreOutput ? edge->to : state] : edge->outputs;
         QSet<QString> actual;
         for (int output : values)
             actual.insert(candidate.outputs[output]);

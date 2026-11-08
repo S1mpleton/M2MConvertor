@@ -10,6 +10,7 @@ struct AutomatonCounts {
     int states = 1;
     int inputs = 1;
     int outputs = 1;
+    int transitions = 1;
 };
 
 struct ReactionStep {
@@ -32,7 +33,13 @@ struct TrainingVariant {
         return kind == AutomatonKind::Moore ? moore : mealy;
     }
     bool available() const {
-        return direction == ConversionDirection::MooreToMealy;
+        return direction == ConversionDirection::MooreToMealy || direction == ConversionDirection::MealyToMoore;
+    }
+    AutomatonKind sourceKind() const {
+        return direction == ConversionDirection::MooreToMealy ? AutomatonKind::Moore : AutomatonKind::Mealy;
+    }
+    AutomatonKind targetKind() const {
+        return sourceKind() == AutomatonKind::Moore ? AutomatonKind::Mealy : AutomatonKind::Moore;
     }
 };
 

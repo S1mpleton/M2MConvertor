@@ -40,6 +40,8 @@
 #include <QSpinBox>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QFileDialog>
+#include <QDir>
 #include <QTimer>
 #include <QStyle>
 #include <QMessageBox>
@@ -76,11 +78,16 @@ struct MainWindowTestAccess {
         return window.loadArchive(path, false);
     }
     static bool setup(MainWindow& window, const TrainingVariant& variant) {
+        window.m_variants = {variant};
         return window.setupWorkspace(variant);
     }
-    static void begin(MainWindow& window) { window.beginWork(); }
+    static void begin(MainWindow& window) {
+        window.selectDirection(ConversionDirection::MooreToMealy);
+        window.beginWork();
+    }
     static void acceptCounts(MainWindow& window) {
         window.continueWork();
+        window.m_workflowTabs->setCurrentIndex(1);
         auto* editor = window.m_sourceEditor;
         editor->findChild<QSpinBox*>("mooreStateCount")->setValue(window.m_currentVariant.moore.states);
         editor->findChild<QSpinBox*>("mooreInputCount")->setValue(window.m_currentVariant.moore.inputs);
@@ -94,8 +101,8 @@ struct MainWindowTestAccess {
         return window.saveProgress();
     }
     static void back(MainWindow& window) { window.returnToLanding(); }
-    static bool restore(MainWindow& window, const QJsonObject& data) {
-        return window.restoreProgress(data, QString());
+    static bool restore(MainWindow& window, const QJsonObject& data, const QString& path = QString()) {
+        return window.restoreProgress(data, path);
     }
     static QString html(MainWindow& window) {
         window.m_teacherName->setText("Преподаватель <&>");
@@ -148,20 +155,17 @@ void requireMatrixHeadersFit(AutomatonEditor* editor) {
     }
 }
 
-void testTerminalMooreWorkflow() {
-    const auto task = terminalMooreVariant();
-    const auto moore = terminalMooreAutomaton();
-    Automaton mealy;
-    require(ConversionService::convert(moore, &mealy), "build equivalent Mealy fixture");
+void testDirectionalWorkflow(const TrainingVariant& task, const Automaton& moore, const Automaton& mealy) {
     QJsonObject source, target;
     for (const auto& automaton : {moore, mealy}) {
         const bool isMoore = automaton.kind == AutomatonKind::Moore;
         AutomatonEditor editor;
         editor.setTask(task, automaton.kind);
         const QString prefix = isMoore ? "moore" : "mealy";
-        editor.findChild<QSpinBox*>(prefix + "StateCount")->setValue(3);
-        editor.findChild<QSpinBox*>(prefix + "InputCount")->setValue(3);
-        editor.findChild<QSpinBox*>(prefix + "OutputCount")->setValue(4);
+        const int states = automaton.states.size();
+        editor.findChild<QSpinBox*>(prefix + "StateCount")->setValue(states);
+        editor.findChild<QSpinBox*>(prefix + "InputCount")->setValue(automaton.inputs.size());
+        editor.findChild<QSpinBox*>(prefix + "OutputCount")->setValue(automaton.outputs.size());
         editor.findChild<QPushButton*>("configureTableButton")->click();
         auto* table = editor.findChild<QTableWidget*>("transitionTable");
         auto outputText = [&](const QSet<int>& outputs) {
@@ -171,9 +175,9 @@ void testTerminalMooreWorkflow() {
             return names.isEmpty() ? QString("-") : names.join(", ");
         };
         const int inputRow = isMoore ? 4 : 2;
-        for (int input = 0; input < 3; ++input) {
+        for (int input = 0; input < automaton.inputs.size(); ++input) {
             table->item(inputRow + input, 0)->setText(automaton.inputs[input]);
-            for (int state = 0; state < 3; ++state) {
+            for (int state = 0; state < states; ++state) {
                 const auto* edge = automaton.transition(state, input);
                 if (edge)
                     table->item(inputRow + input, state + 1)->setText(automaton.states[edge->to] +
@@ -181,16 +185,16 @@ void testTerminalMooreWorkflow() {
             }
         }
         if (isMoore)
-            for (int state = 0; state < 3; ++state)
+            for (int state = 0; state < states; ++state)
                 table->item(1, state + 1)->setText(outputText(automaton.mooreOutputs[state]));
         editor.findChild<QPushButton*>("acceptTableButton")->click();
         require(editor.toJson().value("tableAccepted").toBool(), "table accepts the terminal Moore observation for each automaton kind");
 
-        editor.findChild<QSpinBox*>("matrixDimensionEdit")->setValue(3);
+        editor.findChild<QSpinBox*>("matrixDimensionEdit")->setValue(states);
         editor.findChild<QPushButton*>("configureMatrixButton")->click();
         auto* matrix = editor.findChild<QTableWidget*>("transitionMatrix");
-        for (int from = 0; from < 3; ++from)
-            for (int to = 0; to < 3; ++to) {
+        for (int from = 0; from < states; ++from)
+            for (int to = 0; to < states; ++to) {
                 QStringList labels;
                 for (const auto& edge : automaton.transitions)
                     if (edge.from == from && edge.to == to)
@@ -200,14 +204,14 @@ void testTerminalMooreWorkflow() {
             }
         if (isMoore) {
             auto* outputs = editor.findChild<QTableWidget*>("matrixOutputs");
-            for (int state = 0; state < 3; ++state)
+            for (int state = 0; state < states; ++state)
                 outputs->item(state, 1)->setText(outputText(automaton.mooreOutputs[state]));
         }
         editor.findChild<QPushButton*>("acceptMatrixButton")->click();
         require(editor.toJson().value("matrixAccepted").toBool(), "matrix accepts the same terminal Moore observation");
 
         QJsonArray vertices, edges;
-        for (int state = 0; state < 3; ++state)
+        for (int state = 0; state < states; ++state)
             vertices.append(QJsonObject{{"id", state}, {"label", automaton.states[state] +
                 (isMoore ? " / " + outputText(automaton.mooreOutputs[state]) : QString())},
                 {"x", 160 + 220 * state}, {"y", 160}});
@@ -218,7 +222,7 @@ void testTerminalMooreWorkflow() {
         require(graph->fromJson(QJsonObject{{"vertices", vertices}, {"edges", edges}}), "restore the example's graph");
         editor.findChild<QPushButton*>("acceptGraphButton")->click();
         require(editor.completed(), "graph accepts the same terminal Moore observation");
-        (isMoore ? source : target) = editor.toJson();
+        (automaton.kind == task.sourceKind() ? source : target) = editor.toJson();
     }
     QTemporaryDir directory;
     const auto archivePath = directory.filePath("terminal.m2m");
@@ -227,15 +231,79 @@ void testTerminalMooreWorkflow() {
     file.write(makeCompatibleArchive(root)); file.close();
     const QJsonObject progress{{"archivePath", archivePath}, {"variantNumber", task.number},
         {"introCompleted", true}, {"source", source}, {"target", target}};
-    const auto progressPath = directory.filePath("terminal.m2mwork");
+    const auto progressPath = directory.filePath("terminal." + ProgressStore::suffix(task.direction));
     QJsonObject loaded;
     require(ProgressStore::write(progressPath, progress).ok() && ProgressStore::read(progressPath, &loaded).ok(),
         "save and reopen the terminal Moore workflow");
     MainWindow restored;
-    require(MainWindowTestAccess::restore(restored, loaded) &&
+    require(MainWindowTestAccess::restore(restored, loaded, progressPath) &&
         restored.findChild<AutomatonEditor*>("sourceEditor")->completed() &&
         restored.findChild<AutomatonEditor*>("targetEditor")->completed(),
         "reopening the work retains acceptance of all six representations");
+    require(restored.findChild<QPushButton*>(task.direction == ConversionDirection::MooreToMealy
+        ? "mooreToMealyButton" : "mealyToMooreButton")->isChecked(),
+        "opening the work activates its conversion direction");
+    const QString opposite = directory.filePath("wrong." + ProgressStore::suffix(task.direction == ConversionDirection::MooreToMealy
+        ? ConversionDirection::MealyToMoore : ConversionDirection::MooreToMealy));
+    require(!MainWindowTestAccess::restore(restored, loaded, opposite) &&
+        restored.findChild<AutomatonEditor*>("sourceEditor")->completed(),
+        "a mismatched extension is rejected without replacing the current work");
+    auto* title = restored.findChild<HintSplitter*>("startAssignment");
+    require(qobject_cast<QGroupBox*>(title->widget(0))->title().contains(task.sourceKind() == AutomatonKind::Moore ? "Мура" : "Мили"),
+        "assignment title follows the source automaton kind");
+}
+
+void testDirectionalWorkflows() {
+    auto task = terminalMooreVariant();
+    auto moore = terminalMooreAutomaton();
+    Automaton mealy;
+    require(ConversionService::convert(moore, &mealy), "build Mealy fixture");
+    testDirectionalWorkflow(task, moore, mealy);
+    const auto forward = task.reaction;
+    task.direction = ConversionDirection::MealyToMoore;
+    task.reaction.clear();
+    for (int i = 0; i + 1 < forward.size(); ++i)
+        task.reaction.append({forward[i].input, forward[i + 1].outputs});
+    require(ConversionService::convert(mealy, &moore), "build converted Moore fixture");
+    moore.states.clear();
+    for (int i = 0; i < moore.mooreOutputs.size(); ++i) moore.states.append(QString("a%1").arg(i));
+    task.moore.states = moore.states.size();
+    testDirectionalWorkflow(task, moore, mealy);
+}
+
+void testOpeningDirectionalWorkFiles() {
+    QDir().mkpath(ProgressStore::workDirectory());
+    QTemporaryDir directory(QDir(ProgressStore::workDirectory()).filePath("test-XXXXXX"));
+    require(directory.isValid(), "create a temporary Work subfolder");
+    auto forward = terminalMooreVariant();
+    auto reverse = forward;
+    reverse.number = 8; reverse.direction = ConversionDirection::MealyToMoore;
+    reverse.reaction.clear();
+    for (int i = 0; i + 1 < forward.reaction.size(); ++i)
+        reverse.reaction.append({forward.reaction[i].input, forward.reaction[i + 1].outputs});
+    const auto databasePath = directory.filePath("database.db");
+    makeVariantDatabase(databasePath, {forward, reverse});
+    MainWindow window;
+    window.show(); QApplication::processEvents();
+    for (const auto& task : {forward, reverse}) {
+        const auto path = directory.filePath("work." + ProgressStore::suffix(task.direction));
+        const QJsonObject data{{"archivePath", databasePath}, {"variantNumber", task.number}, {"introCompleted", true}};
+        require(ProgressStore::write(path, data).ok(), "write a directional work file");
+        QTimer::singleShot(0, &window, [&] {
+            auto* dialog = window.findChild<QFileDialog*>();
+            require(dialog && dialog->directory().absolutePath() == ProgressStore::workDirectory() &&
+                dialog->nameFilters().join(" ").contains("*.mimu") && dialog->nameFilters().join(" ").contains("*.mumi"),
+                "Open starts in Work and offers both directional extensions");
+            dialog->selectFile(path);
+            require(QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection), "select the saved work");
+        });
+        window.findChild<QPushButton*>("openProgressButton")->click();
+        QApplication::processEvents();
+        const bool moore = task.direction == ConversionDirection::MooreToMealy;
+        require(window.findChild<QPushButton*>(moore ? "mooreToMealyButton" : "mealyToMooreButton")->isChecked() &&
+            window.findChild<QTabWidget*>("workflowTabs")->tabText(1) == (moore ? "Автомат Мура" : "Автомат Мили"),
+            "opening .mumi or .mimu activates its source automaton without a prior direction selection");
+    }
 }
 
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
@@ -252,11 +320,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     file.write(makeCompatibleArchive(root)); file.close();
     require(MainWindowTestAccess::open(window, archivePath), "new archive opens");
     require(window.findChild<QLabel*>("archiveSummary")->text().contains("tasks.m2m") &&
-        window.findChild<QLabel*>("archiveSummary")->text().contains("Вариантов: 2"),
+        window.findChild<QLabel*>("archiveSummary")->text().contains("вариантов: 2"),
         "archive card shows the filename and number of variants");
-    auto* combo = window.findChild<QComboBox*>("variantCombo");
-    require(combo->currentData().toInt() == 7 &&
-        !(combo->model()->flags(combo->model()->index(0, 0)) & Qt::ItemIsEnabled), "unfinished direction disabled");
     MainWindowTestAccess::begin(window);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -265,19 +330,33 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* source = window.findChild<AutomatonEditor*>("sourceEditor");
     auto* target = window.findChild<AutomatonEditor*>("targetEditor");
     auto* table = source->findChild<QTableWidget*>("transitionTable");
-    require(workflow->widget(0)->findChildren<QSpinBox*>().isEmpty(), "start page contains no count inputs");
-    require(window.findChild<QLabel*>("startVariantInfo")->text().contains("№7") &&
-        window.findChild<QLabel*>("startVariantInfo")->text().contains("Мура → Мили"),
-        "start explanations include the variant number and conversion");
-    require(window.findChild<QLabel*>("workInstructions")->text().contains("Ctrl+S") &&
-        table->rowCount() == 0, "detailed instructions precede table configuration");
+    require(workflow->widget(0)->findChildren<QSpinBox*>().size() == 1 &&
+        window.findChild<QSpinBox*>("variantNumber")->value() == 7,
+        "variant selection has a numeric variant field without automaton count fields");
+    require(!window.findChild<HintSplitter*>("startAssignment")->isVisible() && table->rowCount() == 0,
+        "the assignment is hidden until the variant is accepted");
     require(qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() ==
         "Пояснения к работе", "start work area is titled Explanations");
     require(window.screen()->availableGeometry().contains(window.frameGeometry()), "opening a task keeps the frame on screen");
     if (!screenshot.isEmpty()) window.grab().save(screenshot + ".compact-start.png");
     window.findChild<QPushButton*>("continueWorkButton")->click();
-    require(workflow->currentIndex() == 1 && table->rowCount() == 0,
-        "Continue opens Moore without building a table");
+    require(workflow->currentIndex() == 0 && workflow->isTabEnabled(1) && table->rowCount() == 0 &&
+        window.findChild<HintSplitter*>("startAssignment")->isVisible() &&
+        window.findChild<HintSplitter*>("startAssignment")->orientation() == Qt::Vertical,
+        "Accept reveals the vertical assignment and unlocks Moore without building a table");
+    QApplication::processEvents(); QApplication::processEvents();
+    auto* assignment = window.findChild<HintSplitter*>("startAssignment");
+    require(assignment->widget(0)->geometry().bottom() < assignment->widget(1)->geometry().top(),
+        "the theory image is above the instructions");
+    auto* assignmentInstructions = window.findChild<QLabel*>("workInstructions");
+    require(assignmentInstructions->isVisible() && assignmentInstructions->visibleRegion().boundingRect().contains(assignmentInstructions->rect()) &&
+        assignmentInstructions->height() >= assignmentInstructions->heightForWidth(assignmentInstructions->width()),
+        "the complete assignment hint remains visible below the theory image");
+    auto* theoryImage = window.findChild<TaskImage*>("startTaskImage");
+    require(theoryImage->visibleRegion().boundingRect().contains(theoryImage->imageRect()),
+        "the complete theory image fits inside the visible assignment panel");
+    if (!screenshot.isEmpty()) window.grab().save(screenshot + ".variant-accepted.png");
+    workflow->setCurrentIndex(1);
     auto* sourceStates = source->findChild<QSpinBox*>("mooreStateCount");
     sourceStates->setValue(2);
     source->findChild<QSpinBox*>("mooreInputCount")->setValue(1);
@@ -518,9 +597,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* log = window.findChild<LogWindow*>("eventLogWindow");
     require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
     english->trigger(); QApplication::processEvents();
-    require(window.findChild<QPushButton*>("continueWorkButton")->text() == "Continue" &&
+    require(window.findChild<QPushButton*>("continueWorkButton")->text() == "Accept" &&
         qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() == "Work instructions" &&
-        window.findChild<QLabel*>("archiveSummary")->text().contains("Variants: 2"),
+        window.findChild<QLabel*>("archiveSummary")->text().contains("variants: 2"),
         "new start and archive texts follow a live language switch");
     require(hoverHelp(target->findChild<QTableWidget*>("graphReference"), 2, 1) == "a0 / y0, y2\na1 / -\n-/-",
         "cell hints remain input examples after a live language switch");
@@ -942,6 +1021,7 @@ void testValidationAndFeedback() {
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    app.setAttribute(Qt::AA_DontUseNativeDialogs);
     app.setStyle(new ContrastStyle);
     QTemporaryDir settings;
     QCoreApplication::setOrganizationName("M2MTests"); QCoreApplication::setApplicationName("M2MConvertorTests");
@@ -969,27 +1049,26 @@ int main(int argc, char** argv) {
     auto* begin = window.findChild<QPushButton*>(QStringLiteral("beginWorkButton"));
     auto* openProgress = window.findChild<QPushButton*>(QStringLiteral("openProgressButton"));
     require(openArchive && begin && openProgress, "landing actions are available");
-    auto* archiveGroup = window.findChild<QGroupBox*>("archiveGroup");
-    auto* variantGroup = window.findChild<QGroupBox*>("variantGroup");
-    require(archiveGroup->isAncestorOf(openArchive) && variantGroup->isAncestorOf(begin) &&
-        variantGroup->isAncestorOf(openProgress) && openProgress->text() == "Открыть работу…",
-        "landing actions are placed inside their corresponding cards");
-    auto* logo = window.findChild<QLabel*>("landingLogo");
-    require(logo && !logo->pixmap().isNull() && !window.windowIcon().pixmap(32,32).isNull() &&
-        logo->geometry().bottom() < window.findChild<QLabel*>("landingTitle")->geometry().top(),
-        "bundled application icon is available and precedes the landing title");
-    require(openArchive->text() == "Открыть архив вариантов…" &&
-        window.findChild<QAction*>("eventLogAction")->text() == "Журнал событий",
-        "archive and journal captions follow the requested names");
-    require(openArchive->styleSheet().isEmpty() && begin->styleSheet().isEmpty(),
-            "buttons keep the operating-system style");
-    require(!begin->isEnabled(), "work cannot start before BazaVar and variant selection");
+    auto* mooreChoice = window.findChild<QPushButton*>("mooreToMealyButton");
+    auto* mealyChoice = window.findChild<QPushButton*>("mealyToMooreButton");
+    require(mooreChoice && mealyChoice && mooreChoice->isCheckable() && mealyChoice->isCheckable() &&
+        !mooreChoice->isChecked() && !mealyChoice->isChecked(), "the landing screen starts without a selected conversion");
+    QTest::mouseClick(begin, Qt::LeftButton); QApplication::processEvents();
+    require(window.findChild<FeedbackLabel*>("applicationNotification")->text() == "Выберите тип преобразования" &&
+        window.findChild<QStackedWidget*>()->currentIndex() == 0,
+        "Create without a direction asks for the conversion type");
+    QTest::mouseClick(mooreChoice, Qt::LeftButton);
+    QTest::mouseClick(mealyChoice, Qt::LeftButton);
+    require(!mooreChoice->isChecked() && mealyChoice->isChecked(), "the two conversion choices are mutually exclusive");
+    require(!window.windowIcon().pixmap(32,32).isNull(), "the bundled application icon remains available");
+    require(openProgress->text() == "Открыть" && begin->text() == "Создать", "landing actions use the requested short captions");
+    require(begin->styleSheet().isEmpty(), "buttons keep the operating-system style");
     const auto startupSize = window.size();
     for (const auto locale : {"ru_RU", "en"}) {
         TranslationManager::instance().setLocale(locale, false);
         for (const auto& size : {QSize(900, 500), QSize(480, 360), QSize(350, 300)}) {
             window.resize(size); QApplication::processEvents(); QApplication::processEvents();
-            for (auto* button : {openArchive, begin, openProgress}) requireVisibleAction(&window, button);
+            for (auto* button : {mooreChoice, mealyChoice, begin, openProgress}) requireVisibleAction(&window, button);
             const auto a = begin->mapTo(&window, QPoint());
             const auto b = openProgress->mapTo(&window, QPoint());
             require(a.x() < b.x() && a.y() == b.y(),
@@ -998,20 +1077,15 @@ int main(int argc, char** argv) {
     }
     TranslationManager::instance().setLocale("ru_RU", false);
     window.resize(startupSize); QApplication::processEvents(); QApplication::processEvents();
-    auto* landingTitle = window.findChild<QLabel*>(QStringLiteral("landingTitle"));
-    require(landingTitle && landingTitle->palette().color(QPalette::WindowText) == Qt::white,
-            "labels inherit a dark operating-system palette");
-    auto* landingContent = window.findChild<QWidget*>(QStringLiteral("landingContent"));
-    require(landingContent && landingContent->width() > window.width() * 0.8 &&
-            landingContent->height() > 0,
-            "landing content uses most of the main window");
-    for (auto* label : window.findChild<QWidget*>(QStringLiteral("landingContent"))->findChildren<QLabel*>())
-        if (label->wordWrap()) require(label->height() >= label->heightForWidth(label->width()) - 1,
-            "landing instructions fit at the startup minimum size");
+    require(mooreChoice->palette().color(QPalette::ButtonText) == Qt::white,
+        "landing controls inherit the operating-system dark palette");
+    require(mooreChoice->geometry().top() < mealyChoice->geometry().top() &&
+        mooreChoice->geometry().width() == mealyChoice->geometry().width(),
+        "conversion choices are stacked at equal widths");
     auto* workflow = window.findChild<QTabWidget*>(QStringLiteral("workflowTabs"));
     require(workflow && workflow->count() == 4, "four-stage workflow is created");
-    require(workflow->tabText(0) == QString::fromUtf8("Начало работы"),
-            "second specification screen is named Start work");
+    require(workflow->tabText(0) == QString::fromUtf8("Выбор варианта"),
+            "the first workflow tab is Variant selection");
     require(!workflow->isTabEnabled(1) && !workflow->isTabEnabled(2) &&
             !workflow->isTabEnabled(3), "later stages are initially locked");
     require(window.findChild<QPushButton*>(QStringLiteral("createVertexButton")) &&
@@ -1132,7 +1206,8 @@ int main(int argc, char** argv) {
                 "interactive graph screenshot is saved");
     }
     testReactionWorkflow(window, argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
-    testTerminalMooreWorkflow();
+    testDirectionalWorkflows();
+    testOpeningDirectionalWorkFiles();
     testBoundedGraph(argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
     testUnsavedChanges();
     testJournal();

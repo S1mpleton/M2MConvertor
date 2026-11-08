@@ -364,6 +364,54 @@
         <source>Рабочая область</source>
         <translation>Рабочая область</translation>
     </message>
+    <message>
+        <source>Введите номер варианта:</source>
+        <translation>Введите номер варианта:</translation>
+    </message>
+    <message>
+        <source>Выбор варианта</source>
+        <translation>Выбор варианта</translation>
+    </message>
+    <message>
+        <source>К выбору преобразования</source>
+        <translation>К выбору преобразования</translation>
+    </message>
+    <message>
+        <source>Мили → Мура</source>
+        <translation>Мили → Мура</translation>
+    </message>
+    <message>
+        <source>Мура → Мили</source>
+        <translation>Мура → Мили</translation>
+    </message>
+    <message>
+        <source>Открыть</source>
+        <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>Открыть базу вариантов…</source>
+        <translation>Открыть базу вариантов…</translation>
+    </message>
+    <message>
+        <source>Преобразовать частично заданный автомат Мили, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мура.</source>
+        <translation>Преобразовать частично заданный автомат Мили, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мура.</translation>
+    </message>
+    <message>
+        <source>Преобразовать частично заданный автомат Мура, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мили.</source>
+        <translation>Преобразовать частично заданный автомат Мура, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мили.</translation>
+    </message>
+    <message>
+        <source>Создать</source>
+        <translation>Создать</translation>
+    </message>
+    <message>
+        <source>Теоретико-множественное представление автомата Мили</source>
+        <translation>Теоретико-множественное представление автомата Мили</translation>
+    </message>
+    <message>
+        <source>Теоретико-множественное представление автомата Мура</source>
+        <translation>Теоретико-множественное представление автомата Мура</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -671,6 +719,38 @@
         <location filename="mainwindow.cpp" line="641"/>
         <source>Отчёт HTML (*.html)</source>
         <translation>Отчёт HTML (*.html)</translation>
+    </message>
+    <message>
+        <source>%1 — вариантов: %2</source>
+        <translation>%1 — вариантов: %2</translation>
+    </message>
+    <message>
+        <source>variant-%1.%2</source>
+        <translation>variant-%1.%2</translation>
+    </message>
+    <message>
+        <source>База M2MTools (*.db *.m2m);;Все файлы (*)</source>
+        <translation>База M2MTools (*.db *.m2m);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>База вариантов не открыта</source>
+        <translation>База вариантов не открыта</translation>
+    </message>
+    <message>
+        <source>Количество вариантов в базе данных: %1</source>
+        <translation>Количество вариантов в базе данных: %1</translation>
+    </message>
+    <message>
+        <source>Открыть базу вариантов</source>
+        <translation>Открыть базу вариантов</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.%1)</source>
+        <translation>Работа M2MConvertor (*.%1)</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
+        <translation>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</translation>
     </message>
 </context>
 <context>
@@ -1316,6 +1396,34 @@
         <location filename="ui/logwindow.cpp" line="83"/>
         <source>Журнал сохранён: %1.</source>
         <translation>Журнал сохранён: %1.</translation>
+    </message>
+    <message>
+        <source>Вариант №%1 для выбранного преобразования не найден.</source>
+        <translation>Вариант №%1 для выбранного преобразования не найден.</translation>
+    </message>
+    <message>
+        <source>Выберите тип преобразования</source>
+        <translation>Выберите тип преобразования</translation>
+    </message>
+    <message>
+        <source>Не удалось прочитать базу вариантов: %1</source>
+        <translation>Не удалось прочитать базу вариантов: %1</translation>
+    </message>
+    <message>
+        <source>Неизвестный тип преобразования.</source>
+        <translation>Неизвестный тип преобразования.</translation>
+    </message>
+    <message>
+        <source>Нужна database.db новой структуры M2MTools с количеством переходов.</source>
+        <translation>Нужна database.db новой структуры M2MTools с количеством переходов.</translation>
+    </message>
+    <message>
+        <source>Повреждён порядок тактов или выходы реакции в базе.</source>
+        <translation>Повреждён порядок тактов или выходы реакции в базе.</translation>
+    </message>
+    <message>
+        <source>Тип преобразования в файле работы не соответствует его расширению или варианту.</source>
+        <translation>Тип преобразования в файле работы не соответствует его расширению или варианту.</translation>
     </message>
 </context>
 <context>

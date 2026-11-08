@@ -12,6 +12,11 @@
 
 // Bind only application-owned captions; never inspect or replace user input text.
 namespace UiText {
+inline const char* presentationTitle(bool moore) {
+    return moore
+        ? QT_TRANSLATE_NOOP("App", "Теоретико-множественное представление автомата Мура")
+        : QT_TRANSLATE_NOOP("App", "Теоретико-множественное представление автомата Мили");
+}
 inline QString text(const char* source) {
     return QCoreApplication::translate("App", source);
 }

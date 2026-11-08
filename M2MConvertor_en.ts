@@ -364,6 +364,54 @@ Use the divider to resize or hide the hint. Hover over cells for input examples.
         <source>Рабочая область</source>
         <translation>Work area</translation>
     </message>
+    <message>
+        <source>Введите номер варианта:</source>
+        <translation>Enter the variant number:</translation>
+    </message>
+    <message>
+        <source>Выбор варианта</source>
+        <translation>Variant selection</translation>
+    </message>
+    <message>
+        <source>К выбору преобразования</source>
+        <translation>Choose conversion</translation>
+    </message>
+    <message>
+        <source>Мили → Мура</source>
+        <translation>Mealy → Moore</translation>
+    </message>
+    <message>
+        <source>Мура → Мили</source>
+        <translation>Moore → Mealy</translation>
+    </message>
+    <message>
+        <source>Открыть</source>
+        <translation>Open</translation>
+    </message>
+    <message>
+        <source>Открыть базу вариантов…</source>
+        <translation>Open variant database…</translation>
+    </message>
+    <message>
+        <source>Преобразовать частично заданный автомат Мили, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мура.</source>
+        <translation>Convert the partially specified Mealy automaton, given in set-theoretic form, into an equivalent Moore automaton.</translation>
+    </message>
+    <message>
+        <source>Преобразовать частично заданный автомат Мура, представленный в теоретико-множественной форме, в эквивалентный ему автомат Мили.</source>
+        <translation>Convert the partially specified Moore automaton, given in set-theoretic form, into an equivalent Mealy automaton.</translation>
+    </message>
+    <message>
+        <source>Создать</source>
+        <translation>Create</translation>
+    </message>
+    <message>
+        <source>Теоретико-множественное представление автомата Мили</source>
+        <translation>Set-theoretic representation of the Mealy automaton</translation>
+    </message>
+    <message>
+        <source>Теоретико-множественное представление автомата Мура</source>
+        <translation>Set-theoretic representation of the Moore automaton</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -671,6 +719,38 @@ Conversion: %2</translation>
         <location filename="mainwindow.cpp" line="641"/>
         <source>Отчёт HTML (*.html)</source>
         <translation>HTML report (*.html)</translation>
+    </message>
+    <message>
+        <source>%1 — вариантов: %2</source>
+        <translation>%1 — variants: %2</translation>
+    </message>
+    <message>
+        <source>variant-%1.%2</source>
+        <translation>variant-%1.%2</translation>
+    </message>
+    <message>
+        <source>База M2MTools (*.db *.m2m);;Все файлы (*)</source>
+        <translation>M2MTools database (*.db *.m2m);;All files (*)</translation>
+    </message>
+    <message>
+        <source>База вариантов не открыта</source>
+        <translation>No variant database is open</translation>
+    </message>
+    <message>
+        <source>Количество вариантов в базе данных: %1</source>
+        <translation>Number of variants in the database: %1</translation>
+    </message>
+    <message>
+        <source>Открыть базу вариантов</source>
+        <translation>Open variant database</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.%1)</source>
+        <translation>M2MConvertor work (*.%1)</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
+        <translation>M2MConvertor work (*.mumi *.mimu *.m2mwork);;All files (*)</translation>
     </message>
 </context>
 <context>
@@ -1316,6 +1396,34 @@ Conversion: %2</translation>
         <location filename="ui/logwindow.cpp" line="83"/>
         <source>Журнал сохранён: %1.</source>
         <translation>Log saved: %1.</translation>
+    </message>
+    <message>
+        <source>Вариант №%1 для выбранного преобразования не найден.</source>
+        <translation>Variant #%1 was not found for the selected conversion.</translation>
+    </message>
+    <message>
+        <source>Выберите тип преобразования</source>
+        <translation>Choose the conversion type</translation>
+    </message>
+    <message>
+        <source>Не удалось прочитать базу вариантов: %1</source>
+        <translation>Could not read the variant database: %1</translation>
+    </message>
+    <message>
+        <source>Неизвестный тип преобразования.</source>
+        <translation>Unknown conversion type.</translation>
+    </message>
+    <message>
+        <source>Нужна database.db новой структуры M2MTools с количеством переходов.</source>
+        <translation>A current M2MTools database.db with transition counts is required.</translation>
+    </message>
+    <message>
+        <source>Повреждён порядок тактов или выходы реакции в базе.</source>
+        <translation>The database contains corrupted reaction step order or outputs.</translation>
+    </message>
+    <message>
+        <source>Тип преобразования в файле работы не соответствует его расширению или варианту.</source>
+        <translation>The conversion type in the work file does not match its extension or variant.</translation>
     </message>
 </context>
 <context>

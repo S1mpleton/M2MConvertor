@@ -7,6 +7,10 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QSet>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QUuid>
 
 #include <openssl/evp.h>
 
@@ -113,8 +117,10 @@ bool parseVariant(const QJsonObject& object, TrainingVariant* variant, Message* 
         counts->states = obj.value("states").toInt(-1);
         counts->inputs = obj.value("inputs").toInt(-1);
         counts->outputs = obj.value("outputs").toInt(-1);
+        counts->transitions = obj.contains("transitions") ? obj.value("transitions").toInt(-1) : 1;
         return counts->states >= 1 && counts->states <= 999999 && counts->inputs >= 1 &&
-               counts->inputs <= 10 && counts->outputs >= 1 && counts->outputs <= 10;
+               counts->inputs <= 10 && counts->outputs >= 1 && counts->outputs <= 10 &&
+               counts->transitions >= 1 && counts->transitions <= 999999;
     };
     if (parsed.number > 999999 || !readCounts(object.value("mealy"), &parsed.mealy) ||
         !readCounts(object.value("moore"), &parsed.moore))
@@ -174,6 +180,74 @@ bool parseVariant(const QJsonObject& object, TrainingVariant* variant, Message* 
     *variant = parsed;
     return true;
 }
+
+bool readDatabase(const QString& path, QList<TrainingVariant>* variants, Message* error) {
+    const QString connection = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const bool ok = [&] {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        database.setDatabaseName(path);
+        auto fail = [&](const QString& details) {
+            *error = Message(QT_TRANSLATE_NOOP("Result", "Не удалось прочитать базу вариантов: %1")).arg(details);
+            return false;
+        };
+        if (!database.open() || !database.transaction()) return fail(database.lastError().text());
+        QSqlQuery metadata(database);
+        if (!metadata.exec("SELECT version FROM LiteMetadata") || !metadata.next() ||
+            metadata.value(0).toInt() != 3 || metadata.next()) {
+            *error = Message(QT_TRANSLATE_NOOP("Result", "Нужна database.db новой структуры M2MTools с количеством переходов."));
+            return false;
+        }
+        QSqlQuery rows(database);
+        if (!rows.exec("SELECT id,number,conversion,mealy_states,mealy_inputs,mealy_outputs,mealy_transitions,"
+                       "moore_states,moore_inputs,moore_outputs,moore_transitions FROM Variants ORDER BY number"))
+            return fail(rows.lastError().text());
+        QList<TrainingVariant> loaded;
+        QSet<int> numbers;
+        while (rows.next()) {
+            const int id = rows.value(0).toInt();
+            auto counts = [&](int start) {
+                return QJsonObject{{"states", rows.value(start).toInt()}, {"inputs", rows.value(start + 1).toInt()},
+                    {"outputs", rows.value(start + 2).toInt()}, {"transitions", rows.value(start + 3).toInt()}};
+            };
+            QJsonObject object{{"number", rows.value(1).toInt()}, {"type", rows.value(2).toString()},
+                {"mealy", counts(3)}, {"moore", counts(7)}};
+            QSqlQuery steps(database);
+            steps.prepare("SELECT position,input,outputs_json FROM ReactionSteps WHERE variant_id=:id ORDER BY position");
+            steps.bindValue(":id", id);
+            if (!steps.exec()) return fail(steps.lastError().text());
+            QJsonArray reaction;
+            while (steps.next()) {
+                const auto outputs = QJsonDocument::fromJson(steps.value(2).toString().toUtf8());
+                if (steps.value(0).toInt() != reaction.size() || !outputs.isArray()) {
+                    *error = Message(QT_TRANSLATE_NOOP("Result", "Повреждён порядок тактов или выходы реакции в базе."));
+                    return false;
+                }
+                reaction.append(QJsonObject{{"input", steps.value(1).toString()}, {"outputs", outputs.array()}});
+            }
+            object.insert("reaction", reaction);
+            QSqlQuery image(database);
+            image.prepare("SELECT data,file_name FROM VariantImages WHERE variant_id=:id");
+            image.bindValue(":id", id);
+            if (!image.exec()) return fail(image.lastError().text());
+            if (image.next())
+                object.insert("image", QJsonObject{{"fileName", image.value(1).toString()},
+                    {"data", QString::fromLatin1(image.value(0).toByteArray().toBase64())}});
+            TrainingVariant variant;
+            if (!parseVariant(object, &variant, error)) return false;
+            if (numbers.contains(variant.number)) {
+                *error = Message(QT_TRANSLATE_NOOP("Result", "В BazaVar повторяется вариант №%1.")).arg(variant.number);
+                return false;
+            }
+            numbers.insert(variant.number);
+            loaded.append(variant);
+        }
+        *variants = loaded;
+        return true;
+    }();
+    QSqlDatabase::removeDatabase(connection);
+    return ok;
+}
 } // namespace
 
 QString conversionDirectionName(ConversionDirection direction) {
@@ -194,6 +268,10 @@ Result VariantArchive::read(const QString& path, QList<TrainingVariant>* variant
                 *error = Message(QT_TRANSLATE_NOOP("Result", "Не удалось открыть BazaVar: %1"))
                              .arg(file.errorString());
             return false;
+        }
+        if (file.peek(16).startsWith("SQLite format 3")) {
+            file.close();
+            return readDatabase(path, variants, error);
         }
         const QByteArray archive = file.readAll();
         const int prefixSize = kMagic.size() + kSaltSize + kNonceSize + kTagSize;

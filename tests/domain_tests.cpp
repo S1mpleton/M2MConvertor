@@ -81,9 +81,85 @@ void testTerminalMooreReaction() {
         "an output-only final Moore state may also have no outputs");
 }
 
+void testCurrentDatabaseAndReverseConversion() {
+    auto forward = terminalMooreVariant();
+    forward.mealy.transitions = 8; forward.moore.transitions = 9;
+    const auto originalMoore = terminalMooreAutomaton();
+    Automaton mealy, moore;
+    require(ConversionService::convert(originalMoore, &mealy) && ConversionService::convert(mealy, &moore),
+        "construct both conversion directions");
+    moore.states = ReactionChecker::stateNames(moore.states.size());
+    auto reverse = forward;
+    reverse.number = 8; reverse.direction = ConversionDirection::MealyToMoore;
+    reverse.moore.states = moore.states.size();
+    reverse.reaction.clear();
+    for (int i = 0; i + 1 < forward.reaction.size(); ++i)
+        reverse.reaction.append({forward.reaction[i].input, forward.reaction[i + 1].outputs});
+    require(ReactionChecker::check(reverse, mealy).accepted && ReactionChecker::check(reverse, moore).accepted,
+        "Mealy-to-Moore compares each input with the reached Moore state's output");
+    auto changed = moore;
+    changed.mooreOutputs[0] = {3};
+    require(ReactionChecker::check(reverse, changed).accepted, "the initial Moore output is unobserved for a Mealy source trace");
+    changed = moore; changed.transitions.removeFirst();
+    require(!ReactionChecker::check(reverse, changed).accepted, "Mealy-to-Moore requires a transition before comparing an output");
+    int state = 0;
+    for (int i = 0; i + 1 < reverse.reaction.size(); ++i)
+        state = moore.transition(state, moore.inputs.indexOf(reverse.reaction[i].input))->to;
+    changed = moore;
+    for (int i = 0; i < changed.transitions.size(); ++i)
+        if (changed.transitions[i].from == state && changed.transitions[i].input == changed.inputs.indexOf(reverse.reaction.last().input)) {
+            changed.transitions.removeAt(i); break;
+        }
+    require(!ReactionChecker::check(reverse, changed).accepted &&
+        ReactionChecker::check(reverse, changed).step == reverse.reaction.size() - 1,
+        "the final transition of a converted Moore automaton is observed and required");
+
+    QTemporaryDir directory;
+    const auto databasePath = directory.filePath("database.db");
+    makeVariantDatabase(databasePath, {forward, reverse});
+    QFile databaseFile(databasePath); require(databaseFile.open(QIODevice::ReadOnly), "read fixture bytes");
+    const auto before = databaseFile.readAll(); databaseFile.close();
+    QList<TrainingVariant> variants;
+    require(VariantArchive::read(databasePath, &variants).ok() && variants.size() == 2 &&
+        variants[0].mealy.transitions == 8 && variants[0].moore.transitions == 9 &&
+        variants[1].direction == ConversionDirection::MealyToMoore &&
+        variants[0].reaction.last().input.isEmpty() && variants[0].diagram == forward.diagram,
+        "database.db loads transition counts, both directions, image and ordered reaction");
+    require(databaseFile.open(QIODevice::ReadOnly) && databaseFile.readAll() == before,
+        "reading the SQLite database leaves its bytes unchanged");
+    databaseFile.close();
+    auto root = trainingArchiveJson(); root.insert("variants", QJsonArray{trainingVariantJson(forward)});
+    const auto archivePath = directory.filePath("current.m2m");
+    auto load = [&](const QJsonObject& json) {
+        QFile file(archivePath); require(file.open(QIODevice::WriteOnly | QIODevice::Truncate), "write current archive fixture");
+        file.write(makeCompatibleArchive(json)); file.close();
+        return VariantArchive::read(archivePath, &variants).ok();
+    };
+    require(load(root) && variants[0].mealy.transitions == 8 && variants[0].moore.transitions == 9,
+        "current encrypted archives also retain both transition counts");
+    auto old = trainingVariantJson(forward);
+    for (const auto& key : {QStringLiteral("mealy"), QStringLiteral("moore")}) {
+        auto counts = old.value(key).toObject(); counts.remove("transitions"); old.insert(key, counts);
+    }
+    root.insert("variants", QJsonArray{old});
+    require(load(root) && variants[0].mealy.transitions == 1 && variants[0].moore.transitions == 1,
+        "older archives without transition counts remain readable");
+    auto malformed = trainingVariantJson(forward);
+    auto counts = malformed.value("moore").toObject(); counts.insert("transitions", 0); malformed.insert("moore", counts);
+    root.insert("variants", QJsonArray{malformed});
+    require(!load(root), "invalid transition count metadata is rejected");
+    require(ProgressStore::directionFromPath("work.MUMI") == ConversionDirection::MooreToMealy &&
+        ProgressStore::directionFromPath("work.mimu") == ConversionDirection::MealyToMoore &&
+        !ProgressStore::directionFromPath("work.m2mwork") &&
+        ProgressStore::pathForDirection("work.mumi", ConversionDirection::MealyToMoore) == "work.mimu" &&
+        ProgressStore::pathForDirection("work", ConversionDirection::MooreToMealy) == "work.mumi",
+        "directional work extensions are recognized and normalized without doubling suffixes");
+}
+
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     testTerminalMooreReaction();
+    testCurrentDatabaseAndReverseConversion();
     auto task = trainingVariant();
     task.reaction = {{"x2", {"y2"}}, {"x1", {"y3", "y0"}},
                      {"x2", {"y2"}}, {"x2", {"y3", "y0"}}};
@@ -144,9 +220,8 @@ int main(int argc, char** argv) {
     wrongCounts.mealy.outputs = 2;
     require(!ReactionChecker::check(wrongCounts, reactionMealy).accepted,
             "actual distinct output count must match the task");
-    wrongCounts.direction = ConversionDirection::MealyToMoore;
-    require(!ReactionChecker::check(wrongCounts, reactionMoore).accepted,
-            "unfinished conversion is unavailable in the checker");
+    wrongCounts.direction = static_cast<ConversionDirection>(99);
+    require(!ReactionChecker::check(wrongCounts, reactionMoore).accepted, "unknown conversion directions are rejected");
     TrainingVariant single;
     single.moore = single.mealy = {1, 1, 1};
     single.reaction = {{"x9", {"y4"}}};
