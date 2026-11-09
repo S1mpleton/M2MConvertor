@@ -432,6 +432,22 @@
         <source>Пример ввода: «y0», «y1, y2», «-»</source>
         <translation>Пример ввода: «y0», «y1, y2», «-»</translation>
     </message>
+    <message>
+        <source>← Назад</source>
+        <translation>← Назад</translation>
+    </message>
+    <message>
+        <source>Далее →</source>
+        <translation>Далее →</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «a0», «a2», «-»</source>
+        <translation>Пример ввода: «a0», «a2», «-»</translation>
+    </message>
+    <message>
+        <source>Сохранить</source>
+        <translation>Сохранить</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -485,6 +501,18 @@
         <location filename="ui/automatongrapheditor.cpp" line="610"/>
         <source>Дуга сохранённого графа ссылается на неизвестную вершину.</source>
         <translation>Дуга сохранённого графа ссылается на неизвестную вершину.</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «y0», «y1, y2», «-»</source>
+        <translation>Пример ввода: «y0», «y1, y2», «-»</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «x1 / y1», «x1 / -; x2 / y2», «-»</source>
+        <translation>Пример ввода: «x1 / y1», «x1 / -; x2 / y2», «-»</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «x0», «x1, x2», «-»</source>
+        <translation>Пример ввода: «x0», «x1, x2», «-»</translation>
     </message>
 </context>
 <context>
@@ -783,6 +811,10 @@
     <message>
         <source>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
         <translation>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.m2ms)</source>
+        <translation>Работа M2MConvertor (*.m2ms)</translation>
     </message>
 </context>
 <context>

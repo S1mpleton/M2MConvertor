@@ -92,9 +92,9 @@ QString AutomatonEditor::cellHelp(const QTableWidget* table, int row, int column
     else if (table == m_matrixOutputs || (m_editorKind == AutomatonKind::Moore && row == 1))
         examples = "«y0», «y1, y2», «-»";
     else if (column == 0)
-        examples = "x0, x2, x9";
+        examples = "«x0», «x2», «x9»";
     else
-        examples = m_editorKind == AutomatonKind::Moore ? "a0, a2, -" : "«a0 / y0», «a1 / y1, y2», «-/-»";
+        examples = m_editorKind == AutomatonKind::Moore ? "«a0», «a2», «-»" : "«a0 / y0», «a1 / y1, y2», «-/-»";
     return UiText::text(QT_TRANSLATE_NOOP("App", "Пример ввода: %1")).arg(examples);
 }
 
@@ -1172,6 +1172,32 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
 
 void AutomatonEditor::commitPendingInput() {
     for (auto* table : {m_transitionTable, m_matrixTable, m_matrixOutputs}) commitCellEditor(table);
+}
+
+int AutomatonEditor::currentStage() const {
+    return m_tabs->currentIndex();
+}
+
+void AutomatonEditor::selectStage(int stage) {
+    if (stage >= 0 && stage < m_tabs->count() && m_tabs->isTabEnabled(stage)) {
+        commitPendingInput();
+        m_tabs->setCurrentIndex(stage);
+    }
+}
+
+bool AutomatonEditor::advance() {
+    switch (currentStage()) {
+    case 0:
+        if (!m_tableConfigured) configureTableFromCounts();
+        else acceptTable();
+        return false;
+    case 1:
+        acceptMatrix();
+        return false;
+    default:
+        acceptGraph();
+        return m_graphAccepted;
+    }
 }
 
 void AutomatonEditor::retranslateTexts() {

@@ -71,6 +71,9 @@ private:
     void createReport();
     QString reportHtml() const;
     void updateWorkflowState();
+    void previousStep();
+    void nextStep();
+    void updateNavigation();
 
     QStackedWidget* m_pages;
     QLabel* m_archivePathLabel;
@@ -83,6 +86,9 @@ private:
     bool m_autoArchiveFailed = false;
     QLabel* m_landingDirection;
     QPushButton* m_beginButton;
+    QPushButton* m_previousStepButton;
+    QPushButton* m_saveStepButton;
+    QPushButton* m_nextStepButton;
 
     QTabWidget* m_workflowTabs;
     QLabel* m_variantTitle;

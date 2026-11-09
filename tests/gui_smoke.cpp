@@ -312,6 +312,47 @@ void testDirectionalWorkflow(const TrainingVariant& task, const Automaton& moore
     require(restored.findChild<QPushButton*>(task.direction == ConversionDirection::MooreToMealy
         ? "mooreToMealyButton" : "mealyToMooreButton")->isChecked(),
         "opening the work activates its conversion direction");
+    restored.findChild<QStackedWidget*>()->setCurrentIndex(1);
+    restored.show(); restored.resize(1000, 750); QApplication::processEvents();
+    auto* workflow = restored.findChild<QTabWidget*>("workflowTabs");
+    auto* sourceEditor = restored.findChild<AutomatonEditor*>("sourceEditor");
+    auto* targetEditor = restored.findChild<AutomatonEditor*>("targetEditor");
+    auto* previous = restored.findChild<QPushButton*>("previousStepButton");
+    auto* save = restored.findChild<QPushButton*>("saveStepButton");
+    auto* next = restored.findChild<QPushButton*>("nextStepButton");
+    const auto step = [&] {
+        if (workflow->currentIndex() == 0) return 0;
+        if (workflow->currentIndex() == 3) return 7;
+        return 1 + (workflow->currentIndex() - 1) * 3 +
+            (workflow->currentIndex() == 1 ? sourceEditor : targetEditor)->currentStage();
+    };
+    const auto sourceAnswers = sourceEditor->answerData();
+    const auto targetAnswers = targetEditor->answerData();
+    for (int expected = 0; expected <= 7; ++expected) {
+        QApplication::processEvents();
+        require(step() == expected, "Next visits variant, source representations, target representations and report in order");
+        for (auto* button : {previous, save, next}) requireVisibleAction(&restored, button);
+        require(previous->mapTo(&restored, QPoint()).x() < save->mapTo(&restored, QPoint()).x() &&
+            save->mapTo(&restored, QPoint()).x() < next->mapTo(&restored, QPoint()).x(),
+            "bottom navigation keeps Back, Save, Next in order");
+        require(next->isEnabled() == (expected < 7), "Next ends at the report");
+        if (expected < 7) next->click();
+    }
+    save->click();
+    QJsonObject savedByButton;
+    require(ProgressStore::read(progressPath, &savedByButton).ok() && savedByButton == MainWindowTestAccess::progress(restored),
+        "the bottom Save button writes the complete work to m2ms");
+    for (int expected = 6; expected >= 0; --expected) {
+        previous->click();
+        require(step() == expected, "Back retraces every representation across automata");
+    }
+    require(sourceEditor->completed() && targetEditor->completed() &&
+        sourceEditor->answerData() == sourceAnswers && targetEditor->answerData() == targetAnswers,
+        "navigation preserves all accepted answers");
+    previous->click();
+    require(restored.findChild<QStackedWidget*>()->currentIndex() == 0,
+        "Back from variant selection returns to the conversion choice");
+    require(MainWindowTestAccess::restore(restored, loaded, progressPath), "reopen the work after navigation");
     const QString opposite = directory.filePath(task.direction == ConversionDirection::MooreToMealy ? "wrong.mimu" : "wrong.mumi");
     require(!MainWindowTestAccess::restore(restored, loaded, opposite) &&
         restored.findChild<AutomatonEditor*>("sourceEditor")->completed(),
@@ -361,8 +402,8 @@ void testOpeningDirectionalWorkFiles() {
         QTimer::singleShot(0, &window, [&] {
             auto* dialog = window.findChild<QFileDialog*>();
             require(dialog && dialog->directory().absolutePath() == ProgressStore::workDirectory() &&
-                dialog->nameFilters().join(" ").contains("*.mimu") && dialog->nameFilters().join(" ").contains("*.mumi"),
-                "Open starts in Work and offers both directional extensions");
+                dialog->nameFilters() == QStringList{"Работа M2MConvertor (*.m2ms)"},
+                "Open starts in Work and offers only m2ms");
             dialog->selectFile(path);
             require(QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection), "select the saved work");
         });
@@ -514,8 +555,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
         table->item(4, 0)->text().isEmpty() && table->item(4, 1)->text() == "-",
         "table auto-generates canonical header, blank input and absent transitions");
     const auto answersBeforeHelp = source->answerData();
-    require(hoverHelp(table, 4, 0) == "Пример ввода: x0, x2, x9" && hoverHelp(table, 1, 1).startsWith("Пример ввода: ") &&
-        hoverHelp(table, 4, 1) == "Пример ввода: a0, a2, -", "Moore cell hints contain input examples only");
+    require(hoverHelp(table, 4, 0) == "Пример ввода: «x0», «x2», «x9»" && hoverHelp(table, 1, 1).startsWith("Пример ввода: ") &&
+        hoverHelp(table, 4, 1) == "Пример ввода: «a0», «a2», «-»", "Moore cell hints quote each input example");
     require(source->answerData() == answersBeforeHelp, "hovering never changes answers");
     table->editItem(table->item(4, 0)); QApplication::processEvents();
     auto* freeInput = table->findChild<QLineEdit*>();
@@ -529,10 +570,10 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     }
     QApplication::processEvents();
     require(table->item(4, 0)->text() == "-", "cleared single field becomes dash on commit");
-    source->findChild<QPushButton*>("acceptTableButton")->click();
+    window.findChild<QPushButton*>("nextStepButton")->click();
     require(!source->toJson().value("tableAccepted").toBool() &&
-        lastPopupText().contains("x0"),
-        "invalid input is reported on Accept in a standard message dialog");
+        source->currentStage() == 0 && lastPopupText().contains("x0"),
+        "Next validates input and stays on the current stage when it is invalid");
     table->item(1, 1)->setText("y4"); table->item(4, 0)->setText("x9");
     if (!screenshot.isEmpty()) {
         QApplication::processEvents(); window.grab().save(screenshot + ".table.png");
@@ -676,7 +717,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     auto* stateEdit = editor->findChild<QLineEdit*>("destinationEditor");
     auto* outputEdit = editor->findChild<QLineEdit*>("outputsEditor");
     require(stateEdit && outputEdit && !stateEdit->validator() && !outputEdit->validator(), "neither Mealy field has a validator");
-    require(stateEdit->toolTip() == "Пример ввода: a0, a2, -" && outputEdit->toolTip().startsWith("Пример ввода: "),
+    require(stateEdit->toolTip() == "Пример ввода: «a0», «a2», «-»" && outputEdit->toolTip().startsWith("Пример ввода: "),
         "both fields of the Mealy editor use example tooltips");
     stateEdit->setText(""); outputEdit->setText(" ");
     QTest::keyClick(outputEdit, Qt::Key_Return); QApplication::processEvents();
@@ -735,6 +776,9 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(log && log->windowTitle() == "Журнал событий", "Settings opens translated event log");
     english->trigger(); QApplication::processEvents();
     require(window.findChild<QPushButton*>("continueWorkButton")->text() == "Accept" &&
+        window.findChild<QPushButton*>("previousStepButton")->text() == "← Back" &&
+        window.findChild<QPushButton*>("saveStepButton")->text() == "Save" &&
+        window.findChild<QPushButton*>("nextStepButton")->text() == "Next →" &&
         qobject_cast<QGroupBox*>(window.findChild<HintSplitter*>("startAssignment")->widget(1))->title() == "Work instructions" &&
         window.findChild<QLabel*>("archiveSummary")->text().contains("variants: 2"),
         "new start and archive texts follow a live language switch");
@@ -782,6 +826,8 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
             auto* representation = (editor == 0 ? source : target)->findChild<QTabWidget*>();
             for (int tab = 0; tab < 3; ++tab) {
                 representation->setCurrentIndex(tab); QApplication::processEvents(); QApplication::processEvents();
+                for (const auto* name : {"previousStepButton", "saveStepButton", "nextStepButton"})
+                    requireVisibleAction(&window, window.findChild<QPushButton*>(name));
                 auto* active = representation->currentWidget();
                 if (tab == 1) requireMatrixHeadersFit(editor == 0 ? source : target);
                 require(active->rect().contains(active->findChild<HintSplitter*>()->geometry()), "splitter stays inside page on shrink");

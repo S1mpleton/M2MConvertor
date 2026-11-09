@@ -433,7 +433,7 @@ void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
     bool accepted = false;
     const auto state = statePart(vertex->label());
     const QString value = editText(this, tr("Выходы состояния %1").arg(state),
-        tr("Выходы y0…y9 через запятую, либо «-»:"),
+        tr("Пример ввода: «y0», «y1, y2», «-»"),
         vertex->label().section('/', 1).trimmed(), &accepted);
     if (accepted) {
         vertex->setLabel(state + QStringLiteral(" / ") + (value.trimmed().isEmpty() ? QStringLiteral("-") : value));
@@ -444,8 +444,8 @@ void AutomatonGraphEditor::editVertex(GraphVertexItem* vertex) {
 void AutomatonGraphEditor::editEdge(GraphEdgeItem* edge) {
     bool accepted = false;
     const QString hint = m_kind == AutomatonKind::Mealy
-        ? tr("Вход / выходы; например x1 / y1 или x1 / -; x2 / y2")
-        : tr("Входы через запятую, например x1, x2");
+        ? tr("Пример ввода: «x1 / y1», «x1 / -; x2 / y2», «-»")
+        : tr("Пример ввода: «x0», «x1, x2», «-»");
     const QString value = editText(this, tr("Подпись дуги"), hint,
         edge->label(), &accepted);
     if (accepted) {

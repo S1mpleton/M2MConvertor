@@ -31,6 +31,10 @@ public:
     QJsonObject answerData() const;
     void fromJson(const QJsonObject& object);
     void commitPendingInput();
+    int currentStage() const;
+    void selectStage(int stage);
+    // Returns true after the graph is accepted and the next automaton can open.
+    bool advance();
 
 protected:
     bool eventFilter(QObject* object, QEvent* event) override;

@@ -183,6 +183,23 @@ QWidget* MainWindow::createWorkspacePage() {
     m_workflowTabs->setTabEnabled(2, false);
     m_workflowTabs->setTabEnabled(3, false);
     layout->addWidget(m_workflowTabs, 1);
+    auto* navigation = new ActionBar(Qt::AlignHCenter);
+    navigation->setObjectName("workNavigation");
+    m_previousStepButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "← Назад"));
+    m_previousStepButton->setObjectName("previousStepButton");
+    m_saveStepButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Сохранить"));
+    m_saveStepButton->setObjectName("saveStepButton");
+    m_nextStepButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Далее →"));
+    m_nextStepButton->setObjectName("nextStepButton");
+    for (auto* button : {m_previousStepButton, m_saveStepButton, m_nextStepButton}) {
+        button->setMinimumWidth(fontMetrics().horizontalAdvance("MMMMMMMMMM"));
+        navigation->addWidget(button);
+    }
+    layout->addWidget(navigation);
+    connect(m_previousStepButton, &QPushButton::clicked, this, &MainWindow::previousStep);
+    connect(m_saveStepButton, &QPushButton::clicked, this, [this] { saveProgress(); });
+    connect(m_nextStepButton, &QPushButton::clicked, this, &MainWindow::nextStep);
+    connect(m_workflowTabs, &QTabWidget::currentChanged, this, &MainWindow::updateNavigation);
     connect(back, &QPushButton::clicked, this, &MainWindow::returnToLanding);
     connect(m_sourceEditor, &AutomatonEditor::completedChanged, this, [this](bool complete) {
         if (!complete) m_targetEditor->resetEditor();
@@ -521,6 +538,51 @@ void MainWindow::updateWorkflowState() {
     const bool sourceComplete = accepted && m_sourceEditor->completed();
     m_workflowTabs->setTabEnabled(2, sourceComplete);
     m_workflowTabs->setTabEnabled(3, sourceComplete && m_targetEditor->completed());
+    updateNavigation();
+}
+
+void MainWindow::updateNavigation() {
+    m_saveStepButton->setEnabled(m_hasVariant);
+    m_nextStepButton->setEnabled(m_workflowTabs->currentIndex() != 3);
+}
+
+void MainWindow::previousStep() {
+    commitPendingInput();
+    const int page = m_workflowTabs->currentIndex();
+    if (page == 0) {
+        returnToLanding();
+    } else if (page == 3) {
+        m_targetEditor->selectStage(2);
+        m_workflowTabs->setCurrentIndex(2);
+    } else {
+        auto* editor = page == 1 ? m_sourceEditor : m_targetEditor;
+        if (editor->currentStage() > 0) editor->selectStage(editor->currentStage() - 1);
+        else {
+            if (page == 2) m_sourceEditor->selectStage(2);
+            m_workflowTabs->setCurrentIndex(page - 1);
+        }
+    }
+}
+
+void MainWindow::nextStep() {
+    commitPendingInput();
+    const int page = m_workflowTabs->currentIndex();
+    if (page == 0) {
+        if (!m_workflowTabs->isTabEnabled(1)) continueWork();
+        if (m_workflowTabs->isTabEnabled(1)) {
+            m_sourceEditor->selectStage(0);
+            m_workflowTabs->setCurrentIndex(1);
+        }
+    } else if (page == 1 || page == 2) {
+        auto* editor = page == 1 ? m_sourceEditor : m_targetEditor;
+        if (editor->advance()) {
+            updateWorkflowState();
+            if (m_workflowTabs->isTabEnabled(page + 1)) {
+                if (page == 1) m_targetEditor->selectStage(0);
+                m_workflowTabs->setCurrentIndex(page + 1);
+            }
+        }
+    }
 }
 
 void MainWindow::returnToLanding() {
@@ -626,7 +688,7 @@ void MainWindow::openProgress() {
     QDir().mkpath(folder);
     const QString path = QFileDialog::getOpenFileName(
         this, tr("Открыть учебную работу"), folder,
-        tr("Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)"));
+        tr("Работа M2MConvertor (*.m2ms)"));
     if (path.isEmpty()) return;
     QJsonObject data;
     const auto result = ProgressStore::read(path, &data);

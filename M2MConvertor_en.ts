@@ -432,6 +432,22 @@ Use the divider to resize or hide the hint. Hover over cells for input examples.
         <source>Пример ввода: «y0», «y1, y2», «-»</source>
         <translation>Input example: «y0», «y1, y2», «-»</translation>
     </message>
+    <message>
+        <source>← Назад</source>
+        <translation>← Back</translation>
+    </message>
+    <message>
+        <source>Далее →</source>
+        <translation>Next →</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «a0», «a2», «-»</source>
+        <translation>Input example: «a0», «a2», «-»</translation>
+    </message>
+    <message>
+        <source>Сохранить</source>
+        <translation>Save</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -485,6 +501,18 @@ Use the divider to resize or hide the hint. Hover over cells for input examples.
         <location filename="ui/automatongrapheditor.cpp" line="610"/>
         <source>Дуга сохранённого графа ссылается на неизвестную вершину.</source>
         <translation>An edge in the saved graph refers to an unknown vertex.</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «y0», «y1, y2», «-»</source>
+        <translation>Input example: «y0», «y1, y2», «-»</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «x1 / y1», «x1 / -; x2 / y2», «-»</source>
+        <translation>Input example: «x1 / y1», «x1 / -; x2 / y2», «-»</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «x0», «x1, x2», «-»</source>
+        <translation>Input example: «x0», «x1, x2», «-»</translation>
     </message>
 </context>
 <context>
@@ -783,6 +811,10 @@ Conversion: %2</translation>
     <message>
         <source>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
         <translation>M2MConvertor work (*.m2ms *.mumi *.mimu *.m2mwork);;All files (*)</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.m2ms)</source>
+        <translation>M2MConvertor work (*.m2ms)</translation>
     </message>
 </context>
 <context>
