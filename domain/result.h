@@ -40,6 +40,8 @@ class Result {
     const QString& details() const {
         return m_details;
     }
+    // Answer diagnostics must not reach notifications or logs in the training app.
+    Result studentFacing() const;
     Result withContext(const Message& context) const {
         auto copy = *this;
         copy.m_context = context;

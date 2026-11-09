@@ -130,6 +130,7 @@ struct MainWindowTestAccess {
         window.m_progressPath = path;
         return window.saveProgress();
     }
+    static bool saveAs(MainWindow& window) { return window.saveProgress(true); }
     static void back(MainWindow& window) { window.returnToLanding(); }
     static bool restore(MainWindow& window, const QJsonObject& data, const QString& path = QString()) {
         return window.restoreProgress(data, path);
@@ -241,7 +242,7 @@ void testDirectionalWorkflow(const TrainingVariant& task, const Automaton& moore
         const auto tableDraft = table->item(inputRow + 2, 2)->text();
         table->item(inputRow + 2, 2)->setText(isMoore ? "a1" : "a1/y1");
         editor.findChild<QPushButton*>("acceptTableButton")->click();
-        require(!editor.toJson().value("tableAccepted").toBool() && validationText.contains("переходов"),
+        require(!editor.toJson().value("tableAccepted").toBool() && validationText == "Данные заполнены неверно.",
             "table rejects an extra unobserved transition despite the matching reaction");
         table->item(inputRow + 2, 2)->setText(tableDraft);
         editor.findChild<QPushButton*>("acceptTableButton")->click();
@@ -267,7 +268,7 @@ void testDirectionalWorkflow(const TrainingVariant& task, const Automaton& moore
         const auto matrixDraft = matrix->item(1, 1)->text();
         matrix->item(1, 1)->setText(isMoore ? "x3" : "x3/y1");
         editor.findChild<QPushButton*>("acceptMatrixButton")->click();
-        require(!editor.toJson().value("matrixAccepted").toBool() && validationText.contains("переходов"),
+        require(!editor.toJson().value("matrixAccepted").toBool() && validationText == "Данные заполнены неверно.",
             "matrix independently rejects an extra unobserved transition");
         matrix->item(1, 1)->setText(matrixDraft);
         editor.findChild<QPushButton*>("acceptMatrixButton")->click();
@@ -286,7 +287,7 @@ void testDirectionalWorkflow(const TrainingVariant& task, const Automaton& moore
         extraEdges.append(QJsonObject{{"from", 1}, {"to", 1}, {"label", isMoore ? "x3" : "x3/y1"}});
         require(graph->fromJson(QJsonObject{{"vertices", vertices}, {"edges", extraEdges}}), "restore graph with an extra edge");
         editor.findChild<QPushButton*>("acceptGraphButton")->click();
-        require(!editor.completed() && validationText.contains("переходов"),
+        require(!editor.completed() && validationText == "Данные заполнены неверно.",
             "graph independently rejects an extra unobserved transition");
         require(graph->fromJson(QJsonObject{{"vertices", vertices}, {"edges", edges}}), "restore the example's graph");
         editor.findChild<QPushButton*>("acceptGraphButton")->click();
@@ -449,22 +450,32 @@ void testAutomaticDatabaseSelection() {
     require(open->isHidden(), "manual database selection starts hidden before automatic discovery");
     require(!MainWindowTestAccess::autoOpen(window, directory.path()) && !open->isHidden(),
         "manual selection appears when automatic discovery finds no database");
+    auto root = trainingArchiveJson();
+    QFile archive(directory.filePath("Учебная база.M2M")); require(archive.open(QIODevice::WriteOnly), "write an archive with a custom name");
+    archive.write(makeCompatibleArchive(root)); archive.close();
+    makeVariantDatabase(directory.filePath("database.db"), {trainingVariant()});
+    require(!MainWindowTestAccess::autoOpen(window, directory.path()) && !open->isHidden(),
+        "automatic opening ignores other m2m names and database.db");
     {
-        QFile broken(directory.filePath("database.db")); require(broken.open(QIODevice::WriteOnly), "write an invalid default database");
+        QFile broken(directory.filePath("BazaVar.m2m")); require(broken.open(QIODevice::WriteOnly), "write an invalid default database");
         broken.write("invalid");
     }
-    auto root = trainingArchiveJson();
-    QFile archive(directory.filePath("BazaVar.m2m")); require(archive.open(QIODevice::WriteOnly), "write default BazaVar archive");
-    archive.write(makeCompatibleArchive(root)); archive.close();
+    require(!MainWindowTestAccess::autoOpen(window, directory.path()) && !open->isHidden(),
+        "a corrupt BazaVar does not fall back to differently named archives");
+    QFile standard(directory.filePath("BazaVar.m2m"));
+    require(standard.open(QIODevice::WriteOnly | QIODevice::Truncate), "write the standard variant base");
+    standard.write(makeCompatibleArchive(root)); standard.close();
     require(MainWindowTestAccess::autoOpen(window, directory.path()) && open->isHidden() &&
         window.findChild<QLabel*>("archiveSummary")->text().contains("BazaVar.m2m"),
-        "discovery tries BazaVar after an invalid database.db and hides manual selection after success");
-    require(QFile::remove(directory.filePath("database.db")), "remove the corrupt database fixture");
+        "automatic opening loads BazaVar and hides manual selection after success");
+    require(QFile::remove(directory.filePath("BazaVar.m2m")), "remove the standard database fixture");
     auto reverse = trainingVariant(); reverse.direction = ConversionDirection::MealyToMoore;
-    makeVariantDatabase(directory.filePath("database.db"), {reverse});
-    require(MainWindowTestAccess::autoOpen(window, directory.path()) && open->isHidden() &&
-        window.findChild<QLabel*>("archiveSummary")->text().contains("BazaVar.m2m"),
-        "discovery skips a valid database without variants for the selected direction");
+    makeVariantDatabase(directory.filePath("BazaVar.m2m"), {reverse});
+    MainWindow unsuitable;
+    unsuitable.findChild<QPushButton*>("mooreToMealyButton")->click();
+    require(!MainWindowTestAccess::autoOpen(unsuitable, directory.path()) &&
+        !unsuitable.findChild<QPushButton*>("openArchiveButton")->isHidden(),
+        "a BazaVar without the selected direction also exposes the manual choice");
     const auto previous = QDir::currentPath();
     require(QDir::setCurrent(directory.path()), "switch current directory for discovery test");
     QTemporaryDir executableDirectory;
@@ -473,6 +484,47 @@ void testAutomaticDatabaseSelection() {
     require(!MainWindowTestAccess::autoOpen(other, executableDirectory.path()),
         "discovery uses its executable directory rather than the current working directory");
     require(QDir::setCurrent(previous), "restore current directory");
+    auto* action = window.findChild<QAction*>("openArchiveAction");
+    require(action && action->isEnabled() && action->isVisible() && action->associatedObjects().size() > 0,
+        "the File menu can open another database after automatic discovery succeeds");
+    QTimer::singleShot(0, &window, [&] {
+        auto* dialog = window.findChild<QFileDialog*>();
+        require(dialog && dialog->directory().absolutePath() == QCoreApplication::applicationDirPath(),
+            "the File menu opens the database chooser beside the executable");
+        dialog->selectFile(directory.filePath("Учебная база.M2M"));
+        require(QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection), "choose a database through File");
+    });
+    action->trigger();
+    require(open->isHidden(), "a successful manual choice keeps the fallback button hidden");
+}
+
+void testDefaultWorkDirectory() {
+    const auto expected = QDir(QCoreApplication::applicationDirPath()).filePath("work");
+    require(ProgressStore::workDirectory() == expected && QDir().mkpath(expected),
+        "work uses a lowercase folder beside the executable");
+    QTemporaryDir directory(QDir(expected).filePath("test-save-XXXXXX")), unrelated;
+    require(directory.isValid() && unrelated.isValid(), "create directories for the default save test");
+    const auto previous = QDir::currentPath();
+    require(QDir::setCurrent(unrelated.path()), "save from another current working directory");
+    MainWindow window;
+    require(MainWindowTestAccess::setup(window, trainingVariant()), "start a draft work");
+    const auto destination = directory.filePath("draft.m2ms");
+    QTimer::singleShot(0, &window, [&] {
+        auto* dialog = window.findChild<QFileDialog*>();
+        require(dialog && dialog->directory().absolutePath() == expected &&
+            dialog->selectedFiles().value(0) == QDir(expected).filePath("variant-7.m2ms"),
+            "first save suggests work/variant-7.m2ms independently of the working directory");
+        dialog->selectFile(destination);
+        require(QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection), "save the draft work");
+    });
+    require(MainWindowTestAccess::save(window, QString()) && QFileInfo::exists(destination), "the draft is saved as m2ms");
+    QTimer::singleShot(0, &window, [&] {
+        auto* dialog = window.findChild<QFileDialog*>();
+        require(dialog && dialog->directory().absolutePath() == expected, "Save As also starts in work");
+        dialog->reject();
+    });
+    require(!MainWindowTestAccess::saveAs(window), "cancelling Save As leaves the draft unchanged");
+    require(QDir::setCurrent(previous), "restore the working directory after saving");
 }
 
 void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
@@ -572,7 +624,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     require(table->item(4, 0)->text() == "-", "cleared single field becomes dash on commit");
     window.findChild<QPushButton*>("nextStepButton")->click();
     require(!source->toJson().value("tableAccepted").toBool() &&
-        source->currentStage() == 0 && lastPopupText().contains("x0"),
+        source->currentStage() == 0 && lastPopupText() == "Данные заполнены неверно.",
         "Next validates input and stays on the current stage when it is invalid");
     table->item(1, 1)->setText("y4"); table->item(4, 0)->setText("x9");
     if (!screenshot.isEmpty()) {
@@ -581,7 +633,7 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
     table->item(4, 1)->setText(" ");
     source->findChild<QPushButton*>("acceptTableButton")->click();
     require(table->item(4, 1)->text() == "-", "empty Moore cell normalizes on Accept");
-    require(!source->toJson().value("tableAccepted").toBool() && lastPopupText().contains("переходов"),
+    require(!source->toJson().value("tableAccepted").toBool() && lastPopupText() == "Данные заполнены неверно.",
         "a table with the correct reaction but too few transitions is rejected");
     table->item(4, 1)->setText("a0");
     source->findChild<QPushButton*>("acceptTableButton")->click();
@@ -922,15 +974,27 @@ void testReactionWorkflow(MainWindow& window, const QString& screenshot) {
 
 void testJournal() {
     auto& logger = Logger::instance(); logger.clear();
-    const auto error = Result::error(Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(4, QString("x9")), ResultCategory::Validation);
+    const auto error = Result::error(Message(QT_TRANSLATE_NOOP("Result", "Такт %1: не задан вход %2.")).arg(4, QString("x9")), ResultCategory::Validation)
+        .withContext(Message("expected y7")).withDetails("actual y8");
     logger.log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Приложение запущено."))));
     logger.log(Result::warning(Message(QT_TRANSLATE_NOOP("Result", "В BazaVar нет вариантов.")), ResultCategory::Archive));
+    static QStringList console;
+    console.clear();
+    auto handler = qInstallMessageHandler([](QtMsgType, const QMessageLogContext&, const QString& text) { console.append(text); });
     logger.log(error);
+    qInstallMessageHandler(handler);
     LogWindow journal; journal.show(); QApplication::processEvents();
     auto* text = journal.findChild<QPlainTextEdit*>("logTextEdit");
-    require(logger.history().size() == 3 && text->toPlainText().contains("Такт 4") && text->toPlainText().contains("x9"), "journal displays retained history with arguments");
+    const auto hidden = [](const QString& text) {
+        return !text.contains("Такт 4") && !text.contains("Step 4") && !text.contains("x9") &&
+            !text.contains("y7") && !text.contains("y8");
+    };
+    require(logger.history().size() == 3 && text->toPlainText().contains("Данные заполнены неверно.") &&
+        hidden(text->toPlainText()) && hidden(console.join('\n')) && hidden(Logger::line(error)) &&
+        logger.history().last().message().text() == "Данные заполнены неверно." && logger.history().last().details().isEmpty(),
+        "journal history, formatted lines and console contain no answer diagnostics");
     journal.findChild<QCheckBox*>("showInfoBox")->setChecked(false);
-    require(!text->toPlainText().contains("Приложение запущено") && text->toPlainText().contains("Такт 4"), "severity filter hides only matching events");
+    require(!text->toPlainText().contains("Приложение запущено") && text->toPlainText().contains("Данные заполнены неверно."), "severity filter hides only matching events");
     journal.findChild<QPushButton*>("copyButton")->click();
     require(QApplication::clipboard()->text() == text->toPlainText(), "copy without selection copies the filtered log");
     auto cursor = text->textCursor(); cursor.movePosition(QTextCursor::Start);
@@ -944,7 +1008,8 @@ void testJournal() {
     QFile file(path); require(file.open(QIODevice::ReadOnly) && QString::fromUtf8(file.readAll()) == text->toPlainText(), "saved log matches the visible filtered entries");
     require(!journal.saveTo(directory.filePath("missing/log.txt")).ok(), "failed log save returns an error");
     TranslationManager::instance().setLocale("en", false); QApplication::processEvents();
-    require(error.text().contains("Step 4") && text->toPlainText().contains("Step 4") && text->toPlainText().contains("x9"), "stored Result translates its template before substituting arguments");
+    require(error.text().contains("Step 4") && text->toPlainText().contains("The data is incorrect.") && hidden(text->toPlainText()),
+        "switching language translates the generic feedback without restoring answer details");
     journal.findChild<QPushButton*>("clearButton")->click();
     require(logger.history().isEmpty() && text->toPlainText().isEmpty(), "clear empties history and all views");
     TranslationManager::instance().setLocale("ru_RU", false);
@@ -1175,9 +1240,9 @@ void testValidationAndFeedback() {
     MainWindowTestAccess::notify(window, Result::success(Message("Saved")));
     require(lastPopupText() == "Saved" && dialogs->icons.last() == QMessageBox::Information,
         "successful actions open information dialogs");
-    MainWindowTestAccess::notify(window, Result::error(Message("Wrong counts"), ResultCategory::Validation));
-    require(lastPopupText() == "Wrong counts" && dialogs->icons.last() == QMessageBox::Warning,
-        "validation failures open warning dialogs");
+    MainWindowTestAccess::notify(window, Result::error(Message("Wrong counts"), ResultCategory::Validation).withDetails("Expected 7"));
+    require(lastPopupText() == "Данные заполнены неверно." && dialogs->icons.last() == QMessageBox::Warning,
+        "validation failures open generic warning dialogs without diagnostic details");
     MainWindowTestAccess::notify(window, Result::error(Message("Cannot save"), ResultCategory::Progress));
     require(dialogs->icons.last() == QMessageBox::Critical, "file failures open error dialogs");
 }
@@ -1374,6 +1439,7 @@ int main(int argc, char** argv) {
     testDirectionalWorkflows();
     testOpeningDirectionalWorkFiles();
     testAutomaticDatabaseSelection();
+    testDefaultWorkDirectory();
     testBoundedGraph(argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString());
     testUnsavedChanges();
     testJournal();

@@ -1,4 +1,15 @@
 #include "domain/result.h"
+
+Result Result::studentFacing() const {
+    auto copy = *this;
+    if (m_category == ResultCategory::Validation && m_level == ResultLevel::Error) {
+        copy.m_message = Message(QT_TRANSLATE_NOOP("Result", "Данные заполнены неверно."));
+        copy.m_context = {};
+        copy.m_details.clear();
+    }
+    return copy;
+}
+
 QString resultLevelName(ResultLevel level) {
     switch (level) {
     case ResultLevel::Info:

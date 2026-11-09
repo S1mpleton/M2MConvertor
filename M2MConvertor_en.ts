@@ -1497,6 +1497,10 @@ Conversion: %2</translation>
         <source>В базе нет вариантов выбранного преобразования.</source>
         <translation>The database has no variants for the selected conversion.</translation>
     </message>
+    <message>
+        <source>Данные заполнены неверно.</source>
+        <translation>The data is incorrect.</translation>
+    </message>
 </context>
 <context>
     <name>TaskImage</name>

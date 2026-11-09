@@ -5,22 +5,24 @@ Logger& Logger::instance() {
     return logger;
 }
 void Logger::log(const Result& result) {
+    const auto entry = result.studentFacing();
     if (m_history.size() >= 1000)
         m_history.removeFirst();
-    m_history.append(result);
-    qInfo().noquote() << line(result);
-    emit appended(result);
+    m_history.append(entry);
+    qInfo().noquote() << line(entry);
+    emit appended(entry);
 }
 void Logger::clear() {
     m_history.clear();
     emit cleared();
 }
 QString Logger::line(const Result& result) {
+    const auto entry = result.studentFacing();
     auto line =
         QStringLiteral("[%1] [%2] [%3] %4")
-            .arg(result.timestamp().toString(Qt::ISODateWithMs), resultLevelName(result.level()),
-                 resultCategoryName(result.category()), result.text());
-    if (!result.details().isEmpty())
-        line += " | " + result.details();
+            .arg(entry.timestamp().toString(Qt::ISODateWithMs), resultLevelName(entry.level()),
+                 resultCategoryName(entry.category()), entry.text());
+    if (!entry.details().isEmpty())
+        line += " | " + entry.details();
     return line;
 }

@@ -1497,6 +1497,10 @@
         <source>В базе нет вариантов выбранного преобразования.</source>
         <translation>В базе нет вариантов выбранного преобразования.</translation>
     </message>
+    <message>
+        <source>Данные заполнены неверно.</source>
+        <translation>Данные заполнены неверно.</translation>
+    </message>
 </context>
 <context>
     <name>TaskImage</name>

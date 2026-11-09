@@ -27,7 +27,7 @@ QString ProgressStore::savePath(const QString& path) {
 }
 
 QString ProgressStore::workDirectory() {
-    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("Work"));
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("work"));
 }
 
 Result ProgressStore::write(const QString& path, const QJsonObject& data) {

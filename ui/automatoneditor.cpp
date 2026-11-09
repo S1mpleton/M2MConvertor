@@ -644,7 +644,7 @@ void AutomatonEditor::acceptTable() {
         return;
     }
     const Result check = checkCandidate(actual);
-    emit feedbackRequested(check.withContext(validationContext(0)));
+    emit feedbackRequested(check.withContext(validationContext(0)).studentFacing());
     if (!check.ok()) return;
     const bool alreadyAccepted = m_tableAccepted;
     m_tableAutomaton = actual;
@@ -854,7 +854,7 @@ void AutomatonEditor::acceptMatrix() {
         return;
     }
     const Result check = checkCandidate(actual);
-    emit feedbackRequested(check.withContext(validationContext(1)));
+    emit feedbackRequested(check.withContext(validationContext(1)).studentFacing());
     if (!check.ok()) return;
     m_matrixAutomaton = actual;
     m_matrixAccepted = true;
@@ -973,7 +973,7 @@ void AutomatonEditor::acceptGraph() {
         return;
     }
     const Result check = checkCandidate(actual, true);
-    emit feedbackRequested(check.withContext(validationContext(2)));
+    emit feedbackRequested(check.withContext(validationContext(2)).studentFacing());
     const bool wasComplete = m_graphAccepted;
     m_graphAccepted = check.ok();
     if (check.ok()) m_graphAutomaton = actual;
@@ -1010,7 +1010,7 @@ Message AutomatonEditor::validationContext(int page) const {
     return Message(QT_TRANSLATE_NOOP("Result", "%1 — %2")).arg(kind, stage);
 }
 void AutomatonEditor::showFeedback(const Message& message, bool success, int page) {
-    emit feedbackRequested((success ? Result::success(message, ResultCategory::Validation) : Result::error(message, ResultCategory::Validation)).withContext(validationContext(page)));
+    emit feedbackRequested((success ? Result::success(message, ResultCategory::Validation) : Result::error(message, ResultCategory::Validation)).withContext(validationContext(page)).studentFacing());
 }
 
 Result AutomatonEditor::checkCandidate(const Automaton& candidate, bool graph) const {
