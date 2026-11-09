@@ -92,6 +92,8 @@ void testCurrentDatabaseAndReverseConversion() {
     auto reverse = forward;
     reverse.number = 8; reverse.direction = ConversionDirection::MealyToMoore;
     reverse.moore.states = moore.states.size();
+    reverse.mealy.transitions = mealy.transitions.size();
+    reverse.moore.transitions = moore.transitions.size();
     reverse.reaction.clear();
     for (int i = 0; i + 1 < forward.reaction.size(); ++i)
         reverse.reaction.append({forward.reaction[i].input, forward.reaction[i + 1].outputs});
@@ -151,9 +153,12 @@ void testCurrentDatabaseAndReverseConversion() {
     require(ProgressStore::directionFromPath("work.MUMI") == ConversionDirection::MooreToMealy &&
         ProgressStore::directionFromPath("work.mimu") == ConversionDirection::MealyToMoore &&
         !ProgressStore::directionFromPath("work.m2mwork") &&
-        ProgressStore::pathForDirection("work.mumi", ConversionDirection::MealyToMoore) == "work.mimu" &&
-        ProgressStore::pathForDirection("work", ConversionDirection::MooreToMealy) == "work.mumi",
-        "directional work extensions are recognized and normalized without doubling suffixes");
+        !ProgressStore::directionFromPath("work.m2ms") &&
+        ProgressStore::savePath("work.mumi") == "work.m2ms" &&
+        ProgressStore::savePath("work.mimu") == "work.m2ms" &&
+        ProgressStore::savePath("work.M2MS") == "work.m2ms" &&
+        ProgressStore::savePath("work") == "work.m2ms",
+        "all new saves use m2ms while old directional extensions remain readable");
 }
 
 int main(int argc, char** argv) {
@@ -163,6 +168,7 @@ int main(int argc, char** argv) {
     auto task = trainingVariant();
     task.reaction = {{"x2", {"y2"}}, {"x1", {"y3", "y0"}},
                      {"x2", {"y2"}}, {"x2", {"y3", "y0"}}};
+    task.moore.transitions = 4; task.mealy.transitions = 3;
     Automaton reactionMoore;
     reactionMoore.kind = AutomatonKind::Moore;
     reactionMoore.states = {"a0", "a1", "a2"};
@@ -228,7 +234,7 @@ int main(int argc, char** argv) {
     Automaton one;
     one.kind = AutomatonKind::Moore; one.states = {"a0"}; one.initialState = 0;
     one.inputs = {"x9"}; one.outputs = {"y4"}; one.mooreOutputs = {{0}};
-    require(ReactionChecker::check(single, one).accepted, "single Moore output needs no final transition");
+    require(!ReactionChecker::check(single, one).accepted, "a matching reaction cannot bypass the declared transition count");
     one.transitions = {{0, 0, 0, {}}};
     require(ReactionChecker::check(single, one).accepted, "single Moore output also accepts a loop");
     single.reaction.append(ReactionStep{"x9", {"y4"}});
@@ -236,6 +242,7 @@ int main(int argc, char** argv) {
     one.transitions.clear();
     require(!ReactionChecker::check(single, one).accepted, "missing nonfinal transition cannot continue");
     single.reaction.removeLast();
+    one.transitions = {{0, 0, 0, {}}};
     one.states.append("a1"); one.mooreOutputs.append(QSet<int>{});
     require(ReactionChecker::check(single, one, true).accepted &&
             !ReactionChecker::check(single, one).accepted, "graph accepts extra states but table uses variant counts");

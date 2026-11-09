@@ -25,8 +25,8 @@ QWidget* MealyCellDelegate::createEditor(QWidget* parent, const QStyleOptionView
     outputs->setPlaceholderText("-");
     state->setMinimumWidth(0);
     outputs->setMinimumWidth(0);
-    UiText::bind(state, "toolTip", QT_TRANSLATE_NOOP("App", "Следующее состояние: одно a0, a1, … или -"));
-    UiText::bind(outputs, "toolTip", QT_TRANSLATE_NOOP("App", "Выходы: y0…y9 через запятую или -"));
+    UiText::bind(state, "toolTip", QT_TRANSLATE_NOOP("App", "Пример ввода: a0, a2, -"));
+    UiText::bind(outputs, "toolTip", QT_TRANSLATE_NOOP("App", "Пример ввода: «y0», «y1, y2», «-»"));
     layout->addWidget(state, 1);
     layout->addWidget(new QLabel("/", editor));
     layout->addWidget(outputs, 2);

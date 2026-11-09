@@ -10,7 +10,6 @@
 
 #include "infrastructure/progressstore.h"
 #include "ui/automatoneditor.h"
-#include "ui/widgets/feedbacklabel.h"
 #include "ui/widgets/taskimage.h"
 #include "ui/widgets/hintsplitter.h"
 #include "ui/widgets/wrappinglabel.h"
@@ -74,20 +73,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     centralLayout->addWidget(m_pages, 1);
     setCentralWidget(central);
     createMenus();
-    m_notification = new FeedbackLabel;
-    m_notification->setObjectName("applicationNotification");
-    auto* notificationArea = new QWidget;
-    notificationArea->setObjectName("notificationArea");
-    auto* notificationLayout = new QVBoxLayout(notificationArea);
-    notificationLayout->setContentsMargins(10, 0, 10, 8);
-    notificationLayout->addWidget(m_notification);
-    centralLayout->addWidget(notificationArea);
-    connect(m_notification, &FeedbackLabel::activeChanged, notificationArea, &QWidget::setVisible);
-    notificationArea->hide();
     for (auto* editor : {m_sourceEditor, m_targetEditor})
         connect(editor, &AutomatonEditor::feedbackRequested, this, &MainWindow::showResult);
     connect(&TranslationManager::instance(), &TranslationManager::languageChanged, this, &MainWindow::refreshTexts);
-    connect(m_notification, &FeedbackLabel::expired, this, [this] { m_lastResult.reset(); });
     m_ready = true;
     refreshTexts();
     Logger::instance().log(Result::success(Message(QT_TRANSLATE_NOOP("Result", "Приложение запущено."))));
@@ -215,6 +203,8 @@ QWidget* MainWindow::createStartPage() {
     m_archivePathLabel->setObjectName("archiveSummary");
     m_archivePathLabel->setTextFormat(Qt::PlainText);
     auto* archiveButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Открыть базу вариантов…"));
+    m_openArchiveButton = archiveButton;
+    archiveButton->hide();
     archiveButton->setObjectName("openArchiveButton");
     archiveButton->setIcon(AppIcons::icon(AppIcons::Kind::Open));
     archiveRow->addWidget(m_archivePathLabel, 1);
@@ -343,14 +333,52 @@ bool MainWindow::loadArchive(const QString& path, bool showErrors) {
         if (showErrors) showResult(empty); else Logger::instance().log(empty);
         return false;
     }
+    const auto direction = selectedDirection();
+    if (direction && std::none_of(variants.cbegin(), variants.cend(), [&](const auto& variant) { return variant.direction == *direction; })) {
+        const auto missing = Result::warning(Message(QT_TRANSLATE_NOOP("Result", "В базе нет вариантов выбранного преобразования.")), ResultCategory::Archive);
+        if (showErrors) showResult(missing); else Logger::instance().log(missing);
+        return false;
+    }
     if (!confirmUnsavedChanges()) return false;
     applyArchive(path, variants);
-    showResult(result);
+    if (showErrors) showResult(result); else Logger::instance().log(result);
     return true;
+}
+
+bool MainWindow::tryOpenArchive(const QString& directory) {
+    const QDir folder(directory);
+    QStringList files;
+    for (const auto& name : {QStringLiteral("database.db"), QStringLiteral("BazaVar.m2m")})
+        if (folder.exists(name)) files.append(name);
+    for (const auto& entry : folder.entryInfoList(QDir::Files | QDir::Readable, QDir::Name)) {
+        const QString suffix = entry.suffix().toLower();
+        if ((suffix == "db" || suffix == "m2m") && !files.contains(entry.fileName()))
+            files.append(entry.fileName());
+    }
+    const auto direction = selectedDirection();
+    for (const auto& name : files) {
+        QList<TrainingVariant> variants;
+        const QString path = folder.filePath(name);
+        const auto result = VariantArchive::read(path, &variants);
+        Logger::instance().log(result);
+        if (!result.ok() || variants.isEmpty()) continue;
+        if (direction && std::none_of(variants.cbegin(), variants.cend(), [&](const auto& variant) {
+            return variant.direction == *direction;
+        })) continue;
+        applyArchive(path, variants);
+        m_autoArchiveFailed = false;
+        m_openArchiveButton->hide();
+        return true;
+    }
+    m_autoArchiveFailed = true;
+    m_openArchiveButton->show();
+    return false;
 }
 
 void MainWindow::applyArchive(const QString& path, const QList<TrainingVariant>& variants) {
     m_archivePath = QFileInfo(path).absoluteFilePath();
+    m_autoArchiveFailed = false;
+    m_openArchiveButton->hide();
     m_variants = variants;
     m_hasVariant = false;
     m_introCompleted = false;
@@ -398,17 +426,13 @@ void MainWindow::beginWork() {
         return;
     }
     if (!confirmUnsavedChanges()) return;
-    m_notification->clearMessage();
-    m_lastResult.reset();
     m_hasVariant = false;
     m_introCompleted = false;
     m_progressPath.clear();
     m_saveAction->setEnabled(false); m_saveAsAction->setEnabled(false);
-    if (m_variants.isEmpty()) {
-        for (const QString& folder : {QDir::currentPath(), QCoreApplication::applicationDirPath()}) {
-            const QString path = QDir(folder).filePath("database.db");
-            if (QFileInfo::exists(path)) { loadArchive(path); break; }
-        }
+    if (std::none_of(m_variants.cbegin(), m_variants.cend(), [&](const auto& variant) { return variant.direction == *direction; })) {
+        m_variants.clear(); m_archivePath.clear();
+        tryOpenArchive(QCoreApplication::applicationDirPath());
     }
     const auto first = std::find_if(m_variants.cbegin(), m_variants.cend(), [&](const auto& variant) {
         return variant.direction == *direction;
@@ -432,7 +456,6 @@ bool MainWindow::setupWorkspace(const TrainingVariant& variant) {
         .arg(variant.number).arg(conversionDirectionName(variant.direction)));
     refreshVariantInfo();
     m_diagramLabel->setImageData(variant.diagram);
-    m_notification->clearMessage();
     m_sourceEditor->setTask(variant, variant.sourceKind());
     m_targetEditor->setTask(variant, variant.targetKind());
     m_workflowTabs->setCurrentIndex(0);
@@ -477,6 +500,7 @@ void MainWindow::refreshArchiveInfo() {
     m_archivePathLabel->setText(m_archivePath.isEmpty() ? tr("База вариантов не открыта") :
         tr("%1 — вариантов: %2").arg(QFileInfo(m_archivePath).fileName()).arg(m_variants.size()));
     m_archivePathLabel->setToolTip(m_archivePath);
+    m_openArchiveButton->setVisible(m_autoArchiveFailed && m_variants.isEmpty());
 }
 
 void MainWindow::refreshVariantInfo() {
@@ -534,6 +558,8 @@ QJsonObject MainWindow::workSnapshot() const {
 }
 
 void MainWindow::commitPendingInput() {
+    m_sourceEditor->commitPendingInput();
+    m_targetEditor->commitPendingInput();
     if (auto* focus = QApplication::focusWidget())
         if (m_sourceEditor->isAncestorOf(focus) || m_targetEditor->isAncestorOf(focus))
             m_workflowTabs->setFocus();
@@ -572,17 +598,20 @@ bool MainWindow::saveProgress(bool saveAs) {
     if (!m_hasVariant) return false;
     commitPendingInput();
     QString path = m_progressPath;
-    if (saveAs || path.isEmpty()) {
+    const bool legacyCollision = !path.isEmpty() && ProgressStore::savePath(path) != path &&
+                                 QFileInfo::exists(ProgressStore::savePath(path));
+    if (saveAs || path.isEmpty() || legacyCollision) {
         const QString folder = ProgressStore::workDirectory();
         QDir().mkpath(folder);
-        const QString extension = ProgressStore::suffix(m_currentVariant.direction);
+        const QString extension = ProgressStore::suffix();
         path = QFileDialog::getSaveFileName(
             this, tr("Сохранить учебную работу"),
-            QDir(folder).filePath(tr("variant-%1.%2").arg(m_currentVariant.number).arg(extension)),
+            legacyCollision ? ProgressStore::savePath(path) :
+                QDir(folder).filePath(tr("variant-%1.%2").arg(m_currentVariant.number).arg(extension)),
             tr("Работа M2MConvertor (*.%1)").arg(extension));
         if (path.isEmpty()) return false;
-        path = ProgressStore::pathForDirection(path, m_currentVariant.direction);
     }
+    path = ProgressStore::savePath(path);
     const auto result = ProgressStore::write(path, progressData());
     showResult(result);
     if (result.ok()) {
@@ -597,7 +626,7 @@ void MainWindow::openProgress() {
     QDir().mkpath(folder);
     const QString path = QFileDialog::getOpenFileName(
         this, tr("Открыть учебную работу"), folder,
-        tr("Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)"));
+        tr("Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)"));
     if (path.isEmpty()) return;
     QJsonObject data;
     const auto result = ProgressStore::read(path, &data);
@@ -725,9 +754,14 @@ void MainWindow::showResult(const Result& result) {
     displayResult(result);
 }
 void MainWindow::displayResult(const Result& result) {
-    m_lastResult = result;
-    m_notification->showMessage(result.text(), result.level() == ResultLevel::Error ? UiFeedbackLevel::Error :
-        result.level() == ResultLevel::Warning ? UiFeedbackLevel::Warning : UiFeedbackLevel::Success);
+    const auto icon = result.level() == ResultLevel::Info ? QMessageBox::Information :
+        (result.level() == ResultLevel::Warning || result.category() == ResultCategory::Validation)
+            ? QMessageBox::Warning : QMessageBox::Critical;
+    QMessageBox box(icon, tr("Внимание!"), result.text(), QMessageBox::Close, this);
+    box.setObjectName("resultMessageDialog");
+    box.setTextFormat(Qt::PlainText);
+    box.button(QMessageBox::Close)->setText(tr("Закрыть"));
+    box.exec();
 }
 void MainWindow::openLog() {
     if (!m_logWindow) {
@@ -751,5 +785,4 @@ void MainWindow::refreshTexts() {
     if (m_hasVariant)
         m_variantTitle->setText(tr("Вариант №%1 — %2").arg(m_currentVariant.number).arg(conversionDirectionName(m_currentVariant.direction)));
     m_sourceEditor->retranslateTexts(); m_targetEditor->retranslateTexts();
-    if (m_lastResult) m_notification->updateMessageText(m_lastResult->text());
 }

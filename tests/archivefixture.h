@@ -29,7 +29,7 @@ inline TrainingVariant trainingVariant() {
 
 inline TrainingVariant terminalMooreVariant() {
     auto task = trainingVariant();
-    task.moore = task.mealy = {3, 3, 4};
+    task.moore = task.mealy = {3, 3, 4, 6};
     task.reaction = {{"x1", {"y1"}}, {"x1", {"y2"}}, {"x2", {"y3", "y4"}},
         {"x2", {"y2"}}, {"x3", {"y1"}}, {"x2", {"y1"}}, {"", {"y3", "y4"}}};
     return task;

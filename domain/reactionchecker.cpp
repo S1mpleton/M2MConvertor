@@ -106,6 +106,10 @@ ReactionCheckResult ReactionChecker::check(const TrainingVariant& task, const Au
             state = edge->to;
         }
     }
+    if (candidate.transitions.size() != counts.transitions)
+        return {false, Message(QT_TRANSLATE_NOOP("Result", "Количество переходов автомата %1 не соответствует варианту: требуется %2, введено %3."))
+            .arg(candidate.kind == AutomatonKind::Moore ? Message(QT_TRANSLATE_NOOP("Result", "Мура")) : Message(QT_TRANSLATE_NOOP("Result", "Мили")))
+            .arg(counts.transitions).arg(candidate.transitions.size())};
     return {true, Message(QT_TRANSLATE_NOOP("Result", "Верно. Реакция из a0 совпадает с вариантом во всех %1 тактах."))
                       .arg(stepCount)};
 }

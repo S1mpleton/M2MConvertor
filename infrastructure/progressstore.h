@@ -8,9 +8,9 @@
 
 class ProgressStore {
   public:
-    static QString suffix(ConversionDirection direction);
+    static QString suffix();
     static std::optional<ConversionDirection> directionFromPath(const QString& path);
-    static QString pathForDirection(const QString& path, ConversionDirection direction);
+    static QString savePath(const QString& path);
     static QString workDirectory();
     static Result write(const QString& path, const QJsonObject& data);
     static Result read(const QString& path, QJsonObject* data);

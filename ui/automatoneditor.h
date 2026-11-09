@@ -30,6 +30,7 @@ public:
     QJsonObject toJson() const;
     QJsonObject answerData() const;
     void fromJson(const QJsonObject& object);
+    void commitPendingInput();
 
 protected:
     bool eventFilter(QObject* object, QEvent* event) override;
@@ -46,6 +47,8 @@ private:
     QWidget* createGraphPage();
     void configureTable();
     void configureTableFromCounts();
+    void changeTableCounts();
+    void updateTableMode();
     void clearTable();
     bool countsMatch() const;
     void fillEmptyCells(QTableWidget* table) const;
@@ -93,6 +96,8 @@ private:
     QTableWidget* m_graphReference;
     QTableWidget* m_transitionTable;
     QWidget* m_tableContent;
+    QWidget* m_tableSetup;
+    QWidget* m_tableView;
     QSpinBox* m_countStates;
     QSpinBox* m_countInputs;
     QSpinBox* m_countOutputs;

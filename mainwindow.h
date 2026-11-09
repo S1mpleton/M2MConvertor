@@ -12,7 +12,6 @@ class QAction;
 class QButtonGroup;
 class QSpinBox;
 class QLabel;
-class FeedbackLabel;
 class TaskImage;
 class QLineEdit;
 class QPushButton;
@@ -53,6 +52,7 @@ private:
     void applyArchive(const QString& path, const QList<TrainingVariant>& variants);
     void chooseArchive();
     bool loadArchive(const QString& path, bool showErrors = true);
+    bool tryOpenArchive(const QString& directory);
     void updateVariantSelection(int index);
     std::optional<ConversionDirection> selectedDirection() const;
     void selectDirection(ConversionDirection direction);
@@ -79,6 +79,8 @@ private:
     QLabel* m_variantCountLabel;
     QLabel* m_workInstructions;
     QPushButton* m_acceptVariantButton;
+    QPushButton* m_openArchiveButton;
+    bool m_autoArchiveFailed = false;
     QLabel* m_landingDirection;
     QPushButton* m_beginButton;
 
@@ -95,11 +97,9 @@ private:
     QLineEdit* m_group;
     QLineEdit* m_recordBook;
 
-    FeedbackLabel* m_notification;
     LogWindow* m_logWindow = nullptr;
     QAction* m_russianAction;
     QAction* m_englishAction;
-    std::optional<Result> m_lastResult;
     bool m_ready = false;
     QAction* m_saveAction;
     QAction* m_saveAsAction;

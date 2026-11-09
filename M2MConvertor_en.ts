@@ -412,6 +412,26 @@ Use the divider to resize or hide the hint. Hover over cells for input examples.
         <source>Теоретико-множественное представление автомата Мура</source>
         <translation>Set-theoretic representation of the Moore automaton</translation>
     </message>
+    <message>
+        <source>Не редактируется</source>
+        <translation>Not editable</translation>
+    </message>
+    <message>
+        <source>Пример ввода: %1</source>
+        <translation>Input example: %1</translation>
+    </message>
+    <message>
+        <source>Изменить количества</source>
+        <translation>Change counts</translation>
+    </message>
+    <message>
+        <source>Пример ввода: a0, a2, -</source>
+        <translation>Input example: a0, a2, -</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «y0», «y1, y2», «-»</source>
+        <translation>Input example: «y0», «y1, y2», «-»</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -751,6 +771,18 @@ Conversion: %2</translation>
     <message>
         <source>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
         <translation>M2MConvertor work (*.mumi *.mimu *.m2mwork);;All files (*)</translation>
+    </message>
+    <message>
+        <source>Внимание!</source>
+        <translation>Attention!</translation>
+    </message>
+    <message>
+        <source>Закрыть</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
+        <translation>M2MConvertor work (*.m2ms *.mumi *.mimu *.m2mwork);;All files (*)</translation>
     </message>
 </context>
 <context>
@@ -1424,6 +1456,14 @@ Conversion: %2</translation>
     <message>
         <source>Тип преобразования в файле работы не соответствует его расширению или варианту.</source>
         <translation>The conversion type in the work file does not match its extension or variant.</translation>
+    </message>
+    <message>
+        <source>Количество переходов автомата %1 не соответствует варианту: требуется %2, введено %3.</source>
+        <translation>The %1 automaton transition count does not match the variant: expected %2, entered %3.</translation>
+    </message>
+    <message>
+        <source>В базе нет вариантов выбранного преобразования.</source>
+        <translation>The database has no variants for the selected conversion.</translation>
     </message>
 </context>
 <context>

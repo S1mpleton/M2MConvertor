@@ -412,6 +412,26 @@
         <source>Теоретико-множественное представление автомата Мура</source>
         <translation>Теоретико-множественное представление автомата Мура</translation>
     </message>
+    <message>
+        <source>Не редактируется</source>
+        <translation>Не редактируется</translation>
+    </message>
+    <message>
+        <source>Пример ввода: %1</source>
+        <translation>Пример ввода: %1</translation>
+    </message>
+    <message>
+        <source>Изменить количества</source>
+        <translation>Изменить количества</translation>
+    </message>
+    <message>
+        <source>Пример ввода: a0, a2, -</source>
+        <translation>Пример ввода: a0, a2, -</translation>
+    </message>
+    <message>
+        <source>Пример ввода: «y0», «y1, y2», «-»</source>
+        <translation>Пример ввода: «y0», «y1, y2», «-»</translation>
+    </message>
 </context>
 <context>
     <name>AutomatonGraphEditor</name>
@@ -751,6 +771,18 @@
     <message>
         <source>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
         <translation>Работа M2MConvertor (*.mumi *.mimu *.m2mwork);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>Внимание!</source>
+        <translation>Внимание!</translation>
+    </message>
+    <message>
+        <source>Закрыть</source>
+        <translation>Закрыть</translation>
+    </message>
+    <message>
+        <source>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</source>
+        <translation>Работа M2MConvertor (*.m2ms *.mumi *.mimu *.m2mwork);;Все файлы (*)</translation>
     </message>
 </context>
 <context>
@@ -1424,6 +1456,14 @@
     <message>
         <source>Тип преобразования в файле работы не соответствует его расширению или варианту.</source>
         <translation>Тип преобразования в файле работы не соответствует его расширению или варианту.</translation>
+    </message>
+    <message>
+        <source>Количество переходов автомата %1 не соответствует варианту: требуется %2, введено %3.</source>
+        <translation>Количество переходов автомата %1 не соответствует варианту: требуется %2, введено %3.</translation>
+    </message>
+    <message>
+        <source>В базе нет вариантов выбранного преобразования.</source>
+        <translation>В базе нет вариантов выбранного преобразования.</translation>
     </message>
 </context>
 <context>

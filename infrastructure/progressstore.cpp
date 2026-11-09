@@ -7,8 +7,8 @@
 #include <QJsonDocument>
 #include <QSaveFile>
 
-QString ProgressStore::suffix(ConversionDirection direction) {
-    return direction == ConversionDirection::MooreToMealy ? QStringLiteral("mumi") : QStringLiteral("mimu");
+QString ProgressStore::suffix() {
+    return QStringLiteral("m2ms");
 }
 
 std::optional<ConversionDirection> ProgressStore::directionFromPath(const QString& path) {
@@ -18,11 +18,10 @@ std::optional<ConversionDirection> ProgressStore::directionFromPath(const QStrin
     return std::nullopt;
 }
 
-QString ProgressStore::pathForDirection(const QString& path, ConversionDirection direction) {
-    const QString extension = suffix(direction);
-    if (QFileInfo(path).suffix().compare(extension, Qt::CaseInsensitive) == 0) return path;
+QString ProgressStore::savePath(const QString& path) {
+    const QString extension = suffix();
     const QString previous = QFileInfo(path).suffix().toLower();
-    if (previous == "mumi" || previous == "mimu" || previous == "m2mwork")
+    if (previous == "m2ms" || previous == "mumi" || previous == "mimu" || previous == "m2mwork")
         return path.left(path.size() - previous.size()) + extension;
     return path + "." + extension;
 }

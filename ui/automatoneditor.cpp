@@ -47,6 +47,16 @@ void ensureItems(QTableWidget* table) {
 WorkScrollArea* scrollWork(QWidget* content) {
     return new WorkScrollArea(content);
 }
+void commitCellEditor(QTableWidget* table) {
+    for (auto* editor : table->viewport()->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
+        if (!editor->isVisible() || (!qobject_cast<QLineEdit*>(editor) && editor->objectName() != "mealyCellEditor"))
+            continue;
+        editor->setProperty("committing", true);
+        auto* delegate = table->itemDelegate();
+        emit delegate->commitData(editor);
+        emit delegate->closeEditor(editor, QAbstractItemDelegate::NoHint);
+    }
+}
 }
 
 AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
@@ -63,6 +73,8 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
                         m_matrixReference, m_graphReference}) {
         table->setShowGrid(false);
         table->viewport()->installEventFilter(this);
+        table->horizontalHeader()->viewport()->installEventFilter(this);
+        table->verticalHeader()->viewport()->installEventFilter(this);
     }
     for (auto* reference : {m_matrixReference, m_graphReference})
         reference->setItemDelegate(new PlainCellDelegate(reference));
@@ -71,20 +83,33 @@ AutomatonEditor::AutomatonEditor(QWidget* parent) : QWidget(parent) {
 }
 
 QString AutomatonEditor::cellHelp(const QTableWidget* table, int row, int column) const {
-    if (table == m_matrixTable) {
-        return m_editorKind == AutomatonKind::Moore ? "x0, x2\n-" : "x0 / y0, y2; x1 / -\n-";
-    }
-    if (table == m_matrixOutputs) return column == 0 ? "a0" : "y0, y2\n-";
-    if (column == 0) return "x0";
-    if (m_editorKind == AutomatonKind::Moore && row <= 1) return "y0, y2\n-";
-    if (row < firstInputRow()) return "a0";
-    return m_editorKind == AutomatonKind::Moore ? "a0\n-" : "a0 / y0, y2\na1 / -\n-/-";
+    const auto* item = table->item(row, column);
+    if (!item || !(item->flags() & Qt::ItemIsEditable) || table->editTriggers() == QAbstractItemView::NoEditTriggers)
+        return UiText::text(QT_TRANSLATE_NOOP("App", "Не редактируется"));
+    QString examples;
+    if (table == m_matrixTable)
+        examples = m_editorKind == AutomatonKind::Moore ? "«x0», «x1, x2», «-»" : "«x0 / y0», «x1 / y1, y2; x2 / -», «-»";
+    else if (table == m_matrixOutputs || (m_editorKind == AutomatonKind::Moore && row == 1))
+        examples = "«y0», «y1, y2», «-»";
+    else if (column == 0)
+        examples = "x0, x2, x9";
+    else
+        examples = m_editorKind == AutomatonKind::Moore ? "a0, a2, -" : "«a0 / y0», «a1 / y1, y2», «-/-»";
+    return UiText::text(QT_TRANSLATE_NOOP("App", "Пример ввода: %1")).arg(examples);
 }
 
 bool AutomatonEditor::eventFilter(QObject* object, QEvent* event) {
     if (event->type() == QEvent::ToolTip) {
         for (auto* table : {m_transitionTable, m_matrixTable, m_matrixOutputs,
                             m_matrixReference, m_graphReference}) {
+            for (auto* header : {table->horizontalHeader(), table->verticalHeader()})
+                if (object == header->viewport()) {
+                    auto* help = static_cast<QHelpEvent*>(event);
+                    if (header->logicalIndexAt(help->pos()) >= 0)
+                        QToolTip::showText(help->globalPos(), UiText::text(QT_TRANSLATE_NOOP("App", "Не редактируется")), header->viewport());
+                    else QToolTip::hideText();
+                    return true;
+                }
             if (object != table->viewport()) continue;
             auto* help = static_cast<QHelpEvent*>(event);
             const auto index = table->indexAt(help->pos());
@@ -106,23 +131,18 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* page = new QWidget;
     auto* outer = new QVBoxLayout(page);
     outer->setContentsMargins(10, 10, 10, 10);
-    outer->setSpacing(8);
     auto* work = new QWidget;
     auto* workLayout = new QVBoxLayout(work);
     workLayout->setContentsMargins(0, 0, 0, 0);
     workLayout->setSpacing(8);
-    auto* setup = new ActionBar(Qt::AlignJustify);
-    m_clearTableButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить таблицу"));
-    m_clearTableButton->setObjectName("clearTableButton");
-    m_clearTableButton->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
-    auto* commands = new QWidget;
-    commands->setObjectName("tableSetupButtons");
-    auto* commandLayout = new QVBoxLayout(commands);
-    commandLayout->setContentsMargins(0, 0, 0, 0);
-    commandLayout->setSpacing(8);
-    commandLayout->addWidget(m_clearTableButton);
-    setup->addWidget(commands);
+    m_tableSetup = new QWidget;
+    m_tableSetup->setObjectName("tableCountSetup");
+    m_tableSetup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    auto* setup = new QHBoxLayout(m_tableSetup);
+    setup->setContentsMargins(0, 0, 0, 0);
     auto* fields = new QWidget;
+    fields->setObjectName("tableCountFields");
+    fields->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     auto* form = new QGridLayout(fields);
     form->setContentsMargins(0, 0, 0, 0);
     m_countStates = new QSpinBox;
@@ -142,21 +162,39 @@ QWidget* AutomatonEditor::createTablePage() {
         auto* label = UiText::make<QLabel>(labels[row]);
         label->setBuddy(counts[row]);
         UiText::bind(counts[row], "accessibleName", labels[row]);
+        counts[row]->setMaximumWidth(fontMetrics().horizontalAdvance("000000") + 32);
         form->addWidget(label, row, 0);
         form->addWidget(counts[row], row, 1);
         connect(counts[row], &QSpinBox::valueChanged, this, [this] {
             if (m_loading) return;
             m_tableConfigured = false;
-            m_acceptTableButton->setEnabled(false);
+            updateTableMode();
             invalidateFromTable();
         });
     }
     auto* build = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
     build->setObjectName("configureTableButton");
     build->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    commandLayout->addWidget(build);
+    build->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     setup->addWidget(fields);
-    workLayout->addWidget(setup);
+    setup->addStretch();
+    setup->addWidget(build);
+    workLayout->addWidget(m_tableSetup);
+
+    m_tableView = new QWidget;
+    m_tableView->setObjectName("tableEditView");
+    auto* viewLayout = new QVBoxLayout(m_tableView);
+    viewLayout->setContentsMargins(0, 0, 0, 0);
+    auto* toolbar = new QHBoxLayout;
+    auto* change = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Изменить количества"));
+    change->setObjectName("changeTableCountsButton");
+    m_clearTableButton = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Очистить таблицу"));
+    m_clearTableButton->setObjectName("clearTableButton");
+    m_clearTableButton->setIcon(AppIcons::icon(AppIcons::Kind::Clear));
+    toolbar->addWidget(change);
+    toolbar->addStretch();
+    toolbar->addWidget(m_clearTableButton);
+    viewLayout->addLayout(toolbar);
     m_tableContent = new QWidget;
     auto* layout = new QVBoxLayout(m_tableContent);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -173,27 +211,30 @@ QWidget* AutomatonEditor::createTablePage() {
     auto* hint = new WrappingLabel;
     UiText::bind(hint, "text", QT_TRANSLATE_NOOP("App", "Мили: ячейка «следующее состояние / выход1, выход2». "
         "Мура: выходы над состояниями. Введите входы x0…x9 слева; «-» означает отсутствие перехода или выхода."));
-    hint->setWordWrap(true);
     layout->addWidget(hint);
-    auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять таблицу"));
-    m_acceptTableButton = accept;
-    accept->setObjectName(QStringLiteral("acceptTableButton"));
-    accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
-    connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptTable);
-    connect(build, &QPushButton::clicked, this, &AutomatonEditor::configureTableFromCounts);
-    connect(m_clearTableButton, &QPushButton::clicked, this, &AutomatonEditor::clearTable);
-    connect(m_transitionTable, &QTableWidget::itemChanged, this, [this] { invalidateFromTable(); });
     auto* body = new QWidget;
     auto* bodyLayout = new QVBoxLayout(body);
     bodyLayout->setContentsMargins(0, 0, 0, 0);
     bodyLayout->addWidget(m_tableContent, 1);
     bodyLayout->addStretch();
-    workLayout->addWidget(scrollWork(body), 1);
+    viewLayout->addWidget(scrollWork(body), 1);
+    auto* accept = UiText::make<QPushButton>(QT_TRANSLATE_NOOP("App", "Принять"));
+    m_acceptTableButton = accept;
+    accept->setObjectName("acceptTableButton");
+    accept->setIcon(AppIcons::icon(AppIcons::Kind::Accept));
     auto* actions = new ActionBar;
     actions->addWidget(accept);
-    workLayout->addWidget(actions);
+    viewLayout->addWidget(actions);
+    workLayout->addWidget(m_tableView, 1);
+    workLayout->addStretch();
+    connect(accept, &QPushButton::clicked, this, &AutomatonEditor::acceptTable);
+    connect(build, &QPushButton::clicked, this, &AutomatonEditor::configureTableFromCounts);
+    connect(change, &QPushButton::clicked, this, &AutomatonEditor::changeTableCounts);
+    connect(m_clearTableButton, &QPushButton::clicked, this, &AutomatonEditor::clearTable);
+    connect(m_transitionTable, &QTableWidget::itemChanged, this, [this] { invalidateFromTable(); });
     m_assignmentPanel = new HintSplitter(UiText::presentationTitle(true), m_assignmentImage, work, "tableAssignment");
     outer->addWidget(m_assignmentPanel, 1);
+    updateTableMode();
     return page;
 }
 
@@ -376,8 +417,7 @@ void AutomatonEditor::resetEditor() {
     m_transitionTable->setRowCount(0);
     m_transitionTable->setColumnCount(0);
     m_tableContent->hide();
-    m_acceptTableButton->setEnabled(m_tableConfigured);
-    m_clearTableButton->setEnabled(m_tableConfigured);
+    updateTableMode();
     resetMatrix();
     m_matrixReference->setRowCount(0);
     m_matrixReference->setColumnCount(0);
@@ -453,8 +493,24 @@ void AutomatonEditor::configureTableFromCounts() {
     }
     if (m_transitionTable->rowCount() == 0) configureTable();
     m_tableConfigured = true;
-    m_acceptTableButton->setEnabled(true);
+    updateTableMode();
     showFeedback(Message(QT_TRANSLATE_NOOP("Result", "Размеры таблицы приняты.")), true, 0);
+}
+
+void AutomatonEditor::updateTableMode() {
+    m_tableSetup->setVisible(!m_tableConfigured);
+    m_tableView->setVisible(m_tableConfigured);
+    m_acceptTableButton->setEnabled(m_tableConfigured);
+    m_clearTableButton->setEnabled(m_tableConfigured);
+}
+
+void AutomatonEditor::changeTableCounts() {
+    commitPendingInput();
+    m_transitionTable->setFocus();
+    m_tableConfigured = false;
+    updateTableMode();
+    invalidateFromTable();
+    m_countStates->setFocus();
 }
 
 void AutomatonEditor::clearTable() {
@@ -578,6 +634,7 @@ void AutomatonEditor::fillEmptyCells(QTableWidget* table) const {
 }
 
 void AutomatonEditor::acceptTable() {
+    commitPendingInput();
     m_transitionTable->setFocus();
     fillEmptyCells(m_transitionTable);
     Automaton actual;
@@ -786,6 +843,7 @@ bool AutomatonEditor::readMatrix(Automaton* result, Message* error) const {
 }
 
 void AutomatonEditor::acceptMatrix() {
+    commitPendingInput();
     m_matrixTable->setFocus();
     fillEmptyCells(m_matrixTable);
     fillEmptyCells(m_matrixOutputs);
@@ -1045,7 +1103,7 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
         m_countOutputs->setValue(legacy && built ? expected.outputs : setup.value("outputs").toInt());
         if (built) configureTable();
         m_tableConfigured = built && countsMatch() && (legacy || setup.value("accepted").toBool());
-        m_acceptTableButton->setEnabled(m_tableConfigured);
+        updateTableMode();
     }
     if (object.value("tableLayout").toInt() == 3) {
         tableFromJson(m_transitionTable, object.value("table").toArray());
@@ -1110,6 +1168,10 @@ void AutomatonEditor::fromJson(const QJsonObject& object) {
         }
     }
     emit completedChanged(m_graphAccepted);
+}
+
+void AutomatonEditor::commitPendingInput() {
+    for (auto* table : {m_transitionTable, m_matrixTable, m_matrixOutputs}) commitCellEditor(table);
 }
 
 void AutomatonEditor::retranslateTexts() {
