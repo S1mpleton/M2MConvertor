@@ -1,0 +1,165 @@
+#pragma once
+#include "domain/trainingvariant.h"
+#include <QBuffer>
+#include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QUuid>
+#include <memory>
+#include <openssl/evp.h>
+
+inline TrainingVariant trainingVariant() {
+    TrainingVariant task;
+    task.number = 7;
+    task.direction = ConversionDirection::MooreToMealy;
+    task.moore = {3, 2, 3};
+    task.mealy = {2, 2, 3};
+    task.reaction = {
+        {"x2", {"y3", "y0"}}, {"x1", {"y2"}}, {"x2", {"y3", "y0"}}, {"x2", {}}, {"x1", {"y2"}}};
+    QImage image(2, 2, QImage::Format_RGB32);
+    image.fill(Qt::white);
+    QBuffer buffer(&task.diagram);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    task.diagramFileName = "task.png";
+    return task;
+}
+
+inline TrainingVariant terminalMooreVariant() {
+    auto task = trainingVariant();
+    task.moore = task.mealy = {3, 3, 4, 6};
+    task.reaction = {{"x1", {"y1"}}, {"x1", {"y2"}}, {"x2", {"y3", "y4"}},
+        {"x2", {"y2"}}, {"x3", {"y1"}}, {"x2", {"y1"}}, {"", {"y3", "y4"}}};
+    return task;
+}
+
+inline Automaton terminalMooreAutomaton() {
+    Automaton automaton;
+    automaton.kind = AutomatonKind::Moore;
+    automaton.states = {"a0", "a1", "a2"};
+    automaton.initialState = 0;
+    automaton.inputs = {"x1", "x2", "x3"};
+    automaton.outputs = {"y1", "y2", "y3", "y4"};
+    automaton.mooreOutputs = {{0}, {1}, {2, 3}};
+    automaton.transitions = {{0, 0, 1, {}}, {0, 1, 2, {}}, {0, 2, 0, {}},
+        {1, 0, 2, {}}, {1, 1, 0, {}}, {2, 1, 1, {}}};
+    return automaton;
+}
+
+inline QJsonObject trainingVariantJson(const TrainingVariant& task = trainingVariant()) {
+    QJsonArray steps;
+    for (const auto& step : task.reaction)
+        steps.append(QJsonObject{{"input", step.input},
+                                 {"outputs", QJsonArray::fromStringList(step.outputs)}});
+    return {{"number", task.number},
+            {"type", task.direction == ConversionDirection::MooreToMealy ? "MooreToMealy" : "MealyToMoore"},
+            {"moore", QJsonObject{{"states", task.moore.states}, {"inputs", task.moore.inputs}, {"outputs", task.moore.outputs}, {"transitions", task.moore.transitions}}},
+            {"mealy", QJsonObject{{"states", task.mealy.states}, {"inputs", task.mealy.inputs}, {"outputs", task.mealy.outputs}, {"transitions", task.mealy.transitions}}},
+            {"reaction", steps},
+            {"image", QJsonObject{{"fileName", task.diagramFileName},
+                                  {"data", QString::fromLatin1(task.diagram.toBase64())}}}};
+}
+
+inline QJsonObject trainingArchiveJson() {
+    return {{"format", "M2MToolsLite"},
+            {"version", 1},
+            {"variants", QJsonArray{trainingVariantJson()}}};
+}
+
+inline void makeVariantDatabase(const QString& path, const QList<TrainingVariant>& variants) {
+    const QString connection = QUuid::createUuid().toString();
+    {
+        auto database = QSqlDatabase::addDatabase("QSQLITE", connection);
+        database.setDatabaseName(path);
+        require(database.open(), "open SQLite database fixture");
+        QSqlQuery query(database);
+        require(query.exec("CREATE TABLE LiteMetadata(version INTEGER)") && query.exec("INSERT INTO LiteMetadata VALUES(3)") &&
+            query.exec("CREATE TABLE Variants(id INTEGER PRIMARY KEY,number INTEGER,conversion TEXT,mealy_states INTEGER,"
+                "mealy_inputs INTEGER,mealy_outputs INTEGER,mealy_transitions INTEGER,moore_states INTEGER,moore_inputs INTEGER,"
+                "moore_outputs INTEGER,moore_transitions INTEGER)") &&
+            query.exec("CREATE TABLE ReactionSteps(variant_id INTEGER,position INTEGER,input TEXT,outputs_json TEXT)") &&
+            query.exec("CREATE TABLE VariantImages(variant_id INTEGER,data BLOB,file_name TEXT)"), "create current database schema fixture");
+        for (const auto& variant : variants) {
+            query.prepare("INSERT INTO Variants VALUES(:n,:n,:type,:ms,:mi,:mo,:mt,:rs,:ri,:ro,:rt)");
+            query.bindValue(":n", variant.number);
+            query.bindValue(":type", variant.direction == ConversionDirection::MooreToMealy ? "MooreToMealy" : "MealyToMoore");
+            query.bindValue(":ms", variant.mealy.states); query.bindValue(":mi", variant.mealy.inputs);
+            query.bindValue(":mo", variant.mealy.outputs); query.bindValue(":mt", variant.mealy.transitions);
+            query.bindValue(":rs", variant.moore.states); query.bindValue(":ri", variant.moore.inputs);
+            query.bindValue(":ro", variant.moore.outputs); query.bindValue(":rt", variant.moore.transitions);
+            require(query.exec(), "store fixture variant counts");
+            for (int i = 0; i < variant.reaction.size(); ++i) {
+                query.prepare("INSERT INTO ReactionSteps VALUES(:n,:i,:x,:y)");
+                query.bindValue(":n", variant.number); query.bindValue(":i", i);
+                query.bindValue(":x", variant.reaction[i].input);
+                query.bindValue(":y", QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(variant.reaction[i].outputs)).toJson()));
+                require(query.exec(), "store fixture reaction step");
+            }
+            if (!variant.diagram.isEmpty()) {
+                query.prepare("INSERT INTO VariantImages VALUES(:n,:data,:file)");
+                query.bindValue(":n", variant.number); query.bindValue(":data", variant.diagram);
+                query.bindValue(":file", variant.diagramFileName);
+                require(query.exec(), "store fixture image");
+            }
+        }
+    }
+    QSqlDatabase::removeDatabase(connection);
+}
+
+inline QByteArray archiveKeyMaterial() {
+    const QByteArray left =
+        QByteArray::fromHex("e758d0ffb756c99a9fed62dbb728a1e4cb06939e6d0d017dbb321b89a262c6e8");
+    const QByteArray right =
+        QByteArray::fromHex("91ed552426a3a7bc31a8c75f11d2ec96aec327628668c5aa074e99718add5531");
+    QByteArray result(32, Qt::Uninitialized);
+    for (int i = 0; i < result.size(); ++i)
+        result[i] = left[i] ^ right[i];
+    return result;
+}
+
+inline QByteArray makeCompatibleArchive(const QJsonObject& root = trainingArchiveJson()) {
+    const QByteArray plain = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    const QByteArray magic("M2MLITE1");
+    const QByteArray salt(16, 's');
+    const QByteArray nonce(12, 'n');
+    QByteArray key(32, Qt::Uninitialized);
+    const QByteArray material = archiveKeyMaterial();
+    require(PKCS5_PBKDF2_HMAC(material.constData(), material.size(),
+                              reinterpret_cast<const unsigned char*>(salt.constData()), salt.size(),
+                              200000, EVP_sha256(), key.size(),
+                              reinterpret_cast<unsigned char*>(key.data())) == 1,
+            "test archive key is derived");
+    using Context = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+    Context context(EVP_CIPHER_CTX_new(), &EVP_CIPHER_CTX_free);
+    require(bool(context), "test cipher context created");
+    require(EVP_EncryptInit_ex(context.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr) == 1 &&
+                EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_IVLEN, nonce.size(), nullptr) ==
+                    1 &&
+                EVP_EncryptInit_ex(context.get(), nullptr, nullptr,
+                                   reinterpret_cast<const unsigned char*>(key.constData()),
+                                   reinterpret_cast<const unsigned char*>(nonce.constData())) == 1,
+            "test archive cipher initialized");
+    int written = 0;
+    require(EVP_EncryptUpdate(context.get(), nullptr, &written,
+                              reinterpret_cast<const unsigned char*>(magic.constData()),
+                              magic.size()) == 1,
+            "test archive AAD added");
+    QByteArray encrypted(plain.size() + EVP_MAX_BLOCK_LENGTH, Qt::Uninitialized);
+    int total = 0;
+    require(EVP_EncryptUpdate(context.get(), reinterpret_cast<unsigned char*>(encrypted.data()),
+                              &written, reinterpret_cast<const unsigned char*>(plain.constData()),
+                              plain.size()) == 1,
+            "test archive encrypted");
+    total = written;
+    require(EVP_EncryptFinal_ex(context.get(),
+                                reinterpret_cast<unsigned char*>(encrypted.data()) + total,
+                                &written) == 1,
+            "test archive encryption finalized");
+    encrypted.resize(total + written);
+    QByteArray tag(16, Qt::Uninitialized);
+    require(EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_GET_TAG, tag.size(), tag.data()) == 1,
+            "test archive tag created");
+    return magic + salt + nonce + tag + encrypted;
+}
